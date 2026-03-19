@@ -1,0 +1,20 @@
+-- ============================================
+-- Migration: Create Triggers
+-- Description: updated_at triggers for tables with update tracking
+-- ============================================
+
+-- Trigger: Automatically update contracts.updated_at on row updates
+-- Note: PostgreSQL doesn't support IF NOT EXISTS for triggers, so we drop first
+DROP TRIGGER IF EXISTS update_contracts_updated_at ON contracts;
+CREATE TRIGGER update_contracts_updated_at
+  BEFORE UPDATE ON contracts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger: Automatically update profiles.updated_at on row updates
+-- Note: PostgreSQL doesn't support IF NOT EXISTS for triggers, so we drop first
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
+CREATE TRIGGER update_profiles_updated_at
+  BEFORE UPDATE ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();

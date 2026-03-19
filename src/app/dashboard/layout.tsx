@@ -2,23 +2,36 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Home,
   FileText,
   Plus,
-  Settings,
   Bell,
   Menu,
   X,
   Clock,
+  LogOut,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { LOADING_DELAY_MS } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 
 // Import Phase 2 Components
-import { AddContractForm, ContractFormData } from "@/components/dashboard/add-contract-form";
+import { AddContractForm } from "@/components/dashboard/add-contract-form";
+import type { ContractFormData } from "@/components/dashboard/add-contract-form-types";
 import { ContractDetailView } from "@/components/dashboard/contract-detail-view";
-import { EmailSettingsPanel } from "@/components/dashboard/email-settings-panel";
-import { ConfirmationDialog } from "@/components/dashboard/confirmation-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
 
 // ============================================
@@ -36,17 +49,6 @@ interface Contract {
 }
 
 // ============================================
-// Shared State Context (simple version)
-// ============================================
-let globalContracts: Contract[] = [
-  { id: "1", name: "Enterprise License", vendor: "Acme Corp", type: "license", expiryDate: "Dec 15, 2024", daysLeft: 45, status: "active", value: 24000 },
-  { id: "2", name: "Support Contract", vendor: "TechStart Inc", type: "support", expiryDate: "Dec 28, 2024", daysLeft: 22, status: "expiring", value: 8400 },
-  { id: "3", name: "Cloud Services", vendor: "Startup Hub", type: "subscription", expiryDate: "Nov 30, 2024", daysLeft: 5, status: "critical", value: 12000 },
-  { id: "4", name: "Annual License", vendor: "Global Systems", type: "license", expiryDate: "Jan 5, 2025", daysLeft: 66, status: "active", value: 36000 },
-  { id: "5", name: "Consulting Services", vendor: "DataPro Ltd", type: "service", expiryDate: "Dec 10, 2024", daysLeft: 38, status: "renewing", value: 18000 },
-];
-
-// ============================================
 // Dashboard Layout Component
 // ============================================
 export default function DashboardLayout({
@@ -54,6 +56,8 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const { user, loading: authLoading, logout } = useAuth();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -63,7 +67,6 @@ export default function DashboardLayout({
   // Phase 2: Panel States
   const [addContractOpen, setAddContractOpen] = useState(false);
   const [contractDetailOpen, setContractDetailOpen] = useState(false);
-  const [emailSettingsOpen, setEmailSettingsOpen] = useState(false);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [contractToDelete, setContractToDelete] = useState<string | null>(null);
@@ -81,9 +84,16 @@ export default function DashboardLayout({
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
+  // Auth check - redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, authLoading, router]);
+
   // Simulate loading
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
+    const timer = setTimeout(() => setLoading(false), LOADING_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -101,59 +111,19 @@ export default function DashboardLayout({
     }
   }, []);
 
-  // Handle sidebar action (for buttons that open panels)
-  const handleSidebarAction = (action: string) => {
-    switch (action) {
-      case "add":
-        setAddContractOpen(true);
-        break;
-      case "settings":
-        setEmailSettingsOpen(true);
-        break;
-    }
-  };
-
   // Handle contract click
   const handleContractClick = (contractId: string) => {
     setSelectedContractId(contractId);
     setContractDetailOpen(true);
   };
 
-  // Handle add contract submit
-  const handleAddContract = async (data: ContractFormData) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newContract: Contract = {
-      id: Date.now().toString(),
-      name: data.name,
-      vendor: data.vendor,
-      type: data.type,
-      expiryDate: data.endDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "",
-      daysLeft: data.endDate ? Math.ceil((data.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0,
-      status: "active",
-      value: data.value,
+  // Expose openContractDetail for child pages
+  useEffect(() => {
+    (window as any).openContractDetail = (contractId: string) => {
+      setSelectedContractId(contractId);
+      setContractDetailOpen(true);
     };
     
-    globalContracts = [newContract, ...globalContracts];
-    toast.success("Contract created", `"${data.name}" has been added to your contracts.`);
-  };
-
-  // Handle delete contract
-  const handleDeleteContract = () => {
-    if (contractToDelete) {
-      globalContracts = globalContracts.filter(c => c.id !== contractToDelete);
-      toast.success("Contract deleted", "The contract has been removed.");
-      setDeleteConfirmOpen(false);
-      setContractDetailOpen(false);
-      setContractToDelete(null);
-      // Force re-render of child components
-      window.dispatchEvent(new CustomEvent('contracts-updated'));
-    }
-  };
-
-  // Expose contract click handler globally for child components
-  useEffect(() => {
-    (window as any).openContractDetail = handleContractClick;
     return () => {
       delete (window as any).openContractDetail;
     };
@@ -187,14 +157,14 @@ export default function DashboardLayout({
           <Sidebar
             expanded={sidebarExpanded}
             setExpanded={setSidebarExpanded}
-            onAction={handleSidebarAction}
+            onAddClick={() => setAddContractOpen(true)}
           />
         )}
 
         {/* Mobile Menu Overlay */}
         {mobileMenuOpen && isMobile && (
           <MobileMenu
-            onAction={handleSidebarAction}
+            onAddClick={() => setAddContractOpen(true)}
             onClose={() => setMobileMenuOpen(false)}
           />
         )}
@@ -209,8 +179,8 @@ export default function DashboardLayout({
           <Header
             isMobile={isMobile}
             onMenuClick={() => setMobileMenuOpen(true)}
-            scrolled={scrolled}
             onAddClick={() => setAddContractOpen(true)}
+            scrolled={scrolled}
           />
 
           {/* Content Area - Children render here */}
@@ -220,43 +190,147 @@ export default function DashboardLayout({
         </main>
       </div>
 
-      {/* Phase 2: Slide-over Panels */}
       <AddContractForm
         open={addContractOpen}
         onOpenChange={setAddContractOpen}
-        onSubmit={handleAddContract}
+        onSubmit={async (data: ContractFormData) => {
+          // ✅ Call API to save to Supabase
+          logger.info('Submitting contract data:', data);
+          
+          // Convert Date objects to YYYY-MM-DD format for database compatibility
+          // FIX: Use date-only format to match database schema expectations
+          const formatDate = (date: Date | null): string | null => {
+            if (!date) return null;
+            // Extract date components in local timezone to preserve user's intended date
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          };
+          
+          const response = await fetch('/api/contracts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ...data,
+              startDate: formatDate(data.startDate),
+              endDate: formatDate(data.endDate)
+            })
+          });
+
+          logger.info('Response status:', response.status);
+
+          if (!response.ok) {
+            // Read response as text first to see what we're getting
+            const responseText = await response.text();
+            let errorMessage = 'Failed to create contract';
+            
+            // FIX: Handle empty or malformed responses properly
+            if (!responseText || responseText.trim() === '') {
+              // Empty response body - use status-based error message
+              errorMessage = `Server error (${response.status})`;
+              console.error('[Contract Creation] Empty error response:', {
+                status: response.status,
+                statusText: response.statusText
+              });
+            } else {
+              // Try to parse and extract meaningful error
+              try {
+                const errorData = JSON.parse(responseText);
+                if (errorData && typeof errorData === 'object' && Object.keys(errorData).length > 0) {
+                  // Extract error from structured response
+                  errorMessage = errorData.error || errorData.details || errorData.message || errorMessage;
+                  console.error('[Contract Creation] API error:', {
+                    status: response.status,
+                    error: errorData
+                  });
+                } else {
+                  // Valid JSON but empty or unexpected structure
+                  errorMessage = `Server error (${response.status})`;
+                  console.error('[Contract Creation] Malformed error response:', {
+                    status: response.status,
+                    body: responseText
+                  });
+                }
+              } catch {
+                // Not valid JSON
+                errorMessage = `Server error (${response.status}): ${responseText || response.statusText}`;
+                console.error('[Contract Creation] Non-JSON error response:', {
+                  status: response.status,
+                  statusText: response.statusText,
+                  body: responseText
+                });
+              }
+            }
+            
+            throw new Error(errorMessage);
+          }
+          
+          // Then dispatch event to refresh UI
+          window.dispatchEvent(new CustomEvent('contracts-updated'));
+        }}
       />
 
       <ContractDetailView
         open={contractDetailOpen}
         onOpenChange={setContractDetailOpen}
         contractId={selectedContractId || undefined}
-        onEdit={(id) => {
-          setContractDetailOpen(false);
-          setSelectedContractId(null);
-          toast.info("Edit contract", "Edit functionality coming soon.");
-        }}
         onDelete={(id) => {
           setContractToDelete(id);
           setDeleteConfirmOpen(true);
         }}
       />
 
-      <EmailSettingsPanel
-        open={emailSettingsOpen}
-        onOpenChange={setEmailSettingsOpen}
-      />
-
       {/* Delete Confirmation Dialog */}
-      <ConfirmationDialog
-        open={deleteConfirmOpen}
-        onOpenChange={setDeleteConfirmOpen}
-        title="Delete Contract"
-        description="Are you sure you want to delete this contract? This action cannot be undone."
-        confirmLabel="Delete"
-        variant="danger"
-        onConfirm={handleDeleteContract}
-      />
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Contract</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this contract? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (contractToDelete) {
+                try {
+                  const response = await fetch(`/api/contracts/${contractToDelete}`, {
+                    method: 'DELETE',
+                  });
+
+                  if (response.ok) {
+                    setDeleteConfirmOpen(false);
+                    setContractDetailOpen(false);
+                    setContractToDelete(null);
+                    window.dispatchEvent(new CustomEvent('contracts-updated'));
+                    toast({
+                      title: "Contract deleted",
+                      description: "Your contract has been successfully deleted.",
+                    });
+                  } else {
+                    const errorData = await response.json();
+                    toast({
+                      title: "Error",
+                      description: errorData.error || "Failed to delete contract",
+                      variant: "destructive",
+                    });
+                  }
+                } catch (error) {
+                  console.error('Error deleting contract:', error);
+                  toast({
+                    title: "Error",
+                    description: "Failed to delete contract",
+                    variant: "destructive",
+                  });
+                }
+              }
+            }} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -267,11 +341,12 @@ export default function DashboardLayout({
 interface SidebarProps {
   expanded: boolean;
   setExpanded: (v: boolean) => void;
-  onAction: (action: string) => void;
+  onAddClick?: () => void;
 }
 
-function Sidebar({ expanded, setExpanded, onAction }: SidebarProps) {
+function Sidebar({ expanded, setExpanded, onAddClick }: SidebarProps) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
@@ -279,8 +354,7 @@ function Sidebar({ expanded, setExpanded, onAction }: SidebarProps) {
   ];
 
   const actionItems = [
-    { id: "add", label: "Add New", icon: Plus, emphasized: true },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "add", label: "Add New", icon: Plus, emphasized: true, action: "add" },
   ];
 
   const isActive = (href: string) => {
@@ -354,7 +428,7 @@ function Sidebar({ expanded, setExpanded, onAction }: SidebarProps) {
           {actionItems.map((item, index) => (
             <button
               key={item.id}
-              onClick={() => onAction(item.id)}
+              onClick={onAddClick}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all duration-200 group relative text-[#a3a3a3] hover:text-white hover:bg-white/5`}
               style={{ transitionDelay: `${(navItems.length + index) * 50}ms` }}
             >
@@ -377,19 +451,36 @@ function Sidebar({ expanded, setExpanded, onAction }: SidebarProps) {
 
         {/* User Section */}
         <div className="p-3 border-t border-white/[0.08]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-[#22c55e] flex-shrink-0 flex items-center justify-center text-white text-xs font-semibold">
-              JD
+          {/* User Profile */}
+          {user && (
+            <div className="flex items-center gap-3 mb-3">
+              {/* Avatar with initials */}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                {user.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              
+              {/* User Info */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-white truncate">
+                  {user.full_name || user.email?.split('@')[0] || 'User'}
+                </div>
+                <div className="text-xs text-[#a3a3a3] truncate">
+                  {user.email || 'user@example.com'}
+                </div>
+              </div>
             </div>
-            <div
-              className={`transition-all duration-300 overflow-hidden ${
-                expanded ? "opacity-100 w-auto" : "opacity-0 w-0"
-              }`}
+          )}
+          
+          {/* Logout Button */}
+          <form action={logout} className="mt-2">
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm"
             >
-              <div className="text-sm font-medium text-white truncate">John Doe</div>
-              <div className="text-xs text-[#a3a3a3] truncate">john@company.com</div>
-            </div>
-          </div>
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </aside>
@@ -400,12 +491,13 @@ function Sidebar({ expanded, setExpanded, onAction }: SidebarProps) {
 // Mobile Menu Component
 // ============================================
 interface MobileMenuProps {
-  onAction: (action: string) => void;
+  onAddClick?: () => void;
   onClose: () => void;
 }
 
-function MobileMenu({ onAction, onClose }: MobileMenuProps) {
+function MobileMenu({ onAddClick, onClose }: MobileMenuProps) {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
@@ -413,8 +505,7 @@ function MobileMenu({ onAction, onClose }: MobileMenuProps) {
   ];
 
   const actionItems = [
-    { id: "add", label: "Add New", icon: Plus, emphasized: true },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "add", label: "Add New", icon: Plus, emphasized: true, action: "add" },
   ];
 
   const isActive = (href: string) => {
@@ -477,7 +568,7 @@ function MobileMenu({ onAction, onClose }: MobileMenuProps) {
             <button
               key={item.id}
               onClick={() => {
-                onAction(item.id);
+                onAddClick?.();
                 onClose();
               }}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all text-[#a3a3a3] hover:text-white hover:bg-white/5`}
@@ -498,11 +589,11 @@ function MobileMenu({ onAction, onClose }: MobileMenuProps) {
 interface HeaderProps {
   isMobile: boolean;
   onMenuClick: () => void;
+  onAddClick?: () => void;
   scrolled: boolean;
-  onAddClick: () => void;
 }
 
-function Header({ isMobile, onMenuClick, scrolled, onAddClick }: HeaderProps) {
+function Header({ isMobile, onMenuClick, onAddClick, scrolled }: HeaderProps) {
   const pathname = usePathname();
 
   // Get page title based on route
@@ -564,11 +655,6 @@ function Header({ isMobile, onMenuClick, scrolled, onAddClick }: HeaderProps) {
         <button className="relative w-9 h-9 flex items-center justify-center text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5">
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#22c55e] rounded-full animate-pulse" />
-        </button>
-
-        {/* User Avatar */}
-        <button className="w-8 h-8 rounded-full bg-[#22c55e] flex items-center justify-center text-white text-xs font-semibold">
-          JD
         </button>
       </div>
     </header>

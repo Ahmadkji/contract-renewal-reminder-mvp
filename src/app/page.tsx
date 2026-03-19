@@ -53,6 +53,12 @@ import {
   Linkedin,
   Globe,
 } from "lucide-react";
+import {
+  ANIMATION_DELAY_MS,
+  ANIMATION_DELAY_LONG_MS,
+  ANIMATION_DELAY_VERY_LONG_MS,
+  TRANSITION_DELAY_MS,
+} from "@/lib/constants";
 
 // Custom hook for intersection observer scroll reveal
 function useScrollReveal(threshold = 0.1) {
@@ -95,7 +101,7 @@ function NavigationBar() {
   const lastScrollY = useRef(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 100);
+    const timer = setTimeout(() => setIsVisible(true), ANIMATION_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -206,12 +212,18 @@ function NavigationBar() {
           </button>
 
           {/* Sign In Button */}
-          <button className="hidden sm:flex h-9 px-4 items-center text-sm text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 hover:text-slate-100 transition-all duration-200 focus-ring">
+          <Link
+            href="/login"
+            className="hidden sm:flex h-9 px-4 items-center text-sm text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 hover:text-slate-100 transition-all duration-200 focus-ring"
+          >
             Sign In
-          </button>
-
+          </Link>
+          
           {/* Get Started Button */}
-          <Link href="/dashboard" className="hidden sm:flex h-9 px-4 items-center gap-2 text-sm font-medium bg-cyan-600 text-white rounded-full hover:bg-cyan-500 transition-all duration-200 btn-lift glow-cyan focus-ring">
+          <Link
+            href="/signup"
+            className="hidden sm:flex h-9 px-4 items-center text-sm bg-cyan-500 text-white rounded-full hover:bg-cyan-600 transition-all duration-200 focus-ring"
+          >
             Get Started
             <ArrowRight className="w-4 h-4" />
           </Link>
@@ -246,10 +258,16 @@ function NavigationBar() {
               </a>
             ))}
             <hr className="w-48 border-slate-800" />
-            <button className="w-48 h-12 text-base text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 transition-all focus-ring">
+            <Link
+              href="/login"
+              className="w-48 h-12 text-base text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 transition-all focus-ring flex items-center justify-center"
+            >
               Sign In
-            </button>
-            <Link href="/dashboard" className="w-48 h-12 text-base font-medium bg-cyan-600 text-white rounded-full hover:bg-cyan-500 transition-all flex items-center justify-center gap-2 focus-ring" onClick={() => setMobileMenuOpen(false)}>
+            </Link>
+            <Link
+              href="/signup"
+              className="w-48 h-12 text-base text-white bg-cyan-500 rounded-full hover:bg-cyan-600 transition-all focus-ring flex items-center justify-center gap-2"
+            >
               Get Started
               <ArrowRight className="w-5 h-5" />
             </Link>
@@ -297,83 +315,62 @@ function useTypingEffect(text: string, speed: number = 50, delay: number = 0) {
   return { displayedText, isTyping, isComplete, showCursor };
 }
 
-// Hero Section Component
+// Hero Section Component - Professional Typography-First Design
 function HeroSection() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  // Typing effect starts after hero fade-in completes (800ms for fade-up + 200ms stagger = ~1000ms total)
-  const typingText = "renewal deadline";
-  const { displayedText, isComplete, showCursor } = useTypingEffect(typingText, 50, 1200);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 300);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <section className="relative z-10 pt-40 pb-20 px-4 sm:px-6 lg:px-8">
+    <section className="relative z-10 pt-32 sm:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto text-center">
-        {/* Badge */}
-        <div
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border border-cyan-500/30 bg-cyan-950/30 mb-8 ${
-            isVisible ? "animate-fade-up stagger-1" : "stagger-hidden"
-          }`}
-        >
-          <span className="text-xs font-medium uppercase tracking-wider text-cyan-400">
-            v1.0 Now in Beta
+        {/* Eyebrow */}
+        <div className="animate-hero-eyebrow">
+          <span className="text-[13px] font-medium uppercase tracking-[0.15em] text-slate-400">
+            Contract Renewal Tracking
           </span>
         </div>
 
-        {/* Headline */}
-        <h1
-          className={`font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-tight mb-6 ${
-            isVisible ? "animate-fade-up stagger-2" : "stagger-hidden"
-          }`}
-        >
-          <span className="text-slate-100">Never miss a</span>
-          <br />
-          <span className="gradient-text">
-            {displayedText}
-            {/* Blinking cursor */}
-            {showCursor && (
-              <span
-                className={`inline-block w-[3px] h-[0.9em] bg-cyan-400 ml-1 align-middle ${
-                  isComplete ? "animate-cursor-fade" : "animate-cursor-blink"
-                }`}
-                style={{ marginBottom: "2px" }}
-              />
-            )}
+        {/* Headline - Staggered Word Reveal */}
+        <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-[70px] leading-[1.05] tracking-[-0.03em] mt-6 mb-8">
+          {/* Line 1: NEVER MISS A */}
+          <span className="block">
+            <span className="inline-block animate-hero-word hero-word-1 text-slate-400">NEVER</span>{" "}
+            <span className="inline-block animate-hero-word hero-word-2 text-slate-400">MISS</span>{" "}
+            <span className="inline-block animate-hero-word hero-word-3 text-slate-400">A</span>
           </span>
-          <br />
-          <span className="text-slate-100">again.</span>
+          {/* Line 2: CONTRACT RENEWAL with underline */}
+          <span className="block mt-2">
+            <span className="inline-block animate-hero-word hero-word-4 text-white">CONTRACT</span>{" "}
+            <span className="inline-block animate-hero-word hero-word-5 text-white relative">
+              RENEWAL
+              {/* Underline that draws left-to-right */}
+              <span className="absolute left-0 bottom-0 h-[3px] bg-white w-0 animate-underline-draw" />
+            </span>
+          </span>
         </h1>
 
         {/* Subheadline */}
-        <p
-          className={`font-body max-w-2xl mx-auto text-lg sm:text-xl text-slate-400 leading-relaxed mb-10 ${
-            isVisible ? "animate-fade-up stagger-3" : "stagger-hidden"
-          }`}
-        >
-          The smart contract renewal tracker that keeps your business ahead of
-          deadlines. Get timely reminders, visual countdowns, and seamless
-          integrations.
+        <p className="animate-hero-subheadline max-w-xl mx-auto text-lg sm:text-[20px] text-slate-400 font-normal leading-[1.5] mb-10">
+          Automated tracking, timely reminders, zero missed deadlines
         </p>
 
         {/* CTA Buttons */}
-        <div
-          className={`flex flex-col sm:flex-row items-center justify-center gap-4 ${
-            isVisible ? "animate-fade-up stagger-4" : "stagger-hidden"
-          }`}
-        >
-          <Link href="/dashboard" className="w-full sm:w-auto h-12 px-8 text-base font-medium bg-cyan-600 text-white rounded-full hover:bg-cyan-500 transition-all duration-200 btn-lift glow-cyan flex items-center justify-center gap-2 focus-ring">
-            Start Tracking Free
-            <ArrowRight className="w-5 h-5" />
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
+          {/* Primary CTA - Start Free - Now opens auth modal like "Get Started" */}
+          <Link 
+            href="/signup" 
+            className="animate-hero-cta-primary group w-full sm:w-auto h-12 px-7 text-[14px] font-medium bg-white text-black rounded-md hover:bg-slate-200 transition-all duration-200 flex items-center justify-center gap-2 focus-ring"
+          >
+            Start Free
+            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
           </Link>
-          <button className="w-full sm:w-auto h-12 px-8 text-base font-medium text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 hover:text-slate-100 transition-all duration-200 btn-lift flex items-center justify-center gap-2 focus-ring">
-            <Play className="w-5 h-5" />
-            View Demo
+          {/* Secondary CTA - See How It Works */}
+          <button className="animate-hero-cta-secondary w-full sm:w-auto h-12 px-7 text-[14px] font-medium text-white border border-white/20 rounded-md hover:bg-white/8 hover:border-white/40 transition-all duration-200 flex items-center justify-center focus-ring">
+            See How It Works
           </button>
         </div>
+
+        {/* Honest Microcopy */}
+        <p className="animate-hero-microcopy text-[13px] text-slate-500">
+          No credit card required • 14-day trial • Cancel anytime
+        </p>
       </div>
     </section>
   );
@@ -392,7 +389,7 @@ function StatsCard({ icon, iconColor, metric, label, delay }: StatsCardProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 500);
+    const timer = setTimeout(() => setIsVisible(true), ANIMATION_DELAY_LONG_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -533,103 +530,136 @@ function ContractRow({
   );
 }
 
-// Dashboard Preview Section
+// Dashboard Preview Section - Honest Product Shot with Float Animation
 function DashboardPreview() {
-  const { ref, isVisible } = useScrollReveal();
-
   const contracts = [
     {
-      company: "Acme Corp",
-      contract: "Annual License",
+      company: "AWS Support",
+      contract: "Business Plan",
       date: "Dec 15, 2024",
       status: "active" as const,
       daysLeft: 45,
     },
     {
-      company: "TechStart Inc",
-      contract: "Support Contract",
+      company: "Notion Team",
+      contract: "Enterprise",
       date: "Dec 28, 2024",
       status: "expiring" as const,
       daysLeft: 32,
     },
     {
-      company: "Global Systems",
-      contract: "Enterprise Plan",
+      company: "Figma Pro",
+      contract: "Annual License",
       date: "Jan 5, 2025",
       status: "active" as const,
       daysLeft: 66,
     },
-    {
-      company: "Startup Hub",
-      contract: "Cloud Services",
-      date: "Nov 30, 2024",
-      status: "expiring" as const,
-      daysLeft: 14,
-    },
   ];
 
   return (
-    <section ref={ref} className="relative z-10 px-4 sm:px-6 lg:px-8 pb-24">
-      <div className="max-w-6xl mx-auto">
-        <div
-          className={`bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl shadow-cyan-900/10 ${
-            isVisible ? "animate-fade-up" : "stagger-hidden"
-          }`}
-        >
-          {/* App Chrome */}
-          <div className="h-12 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-rose-500" />
-              <div className="w-3 h-3 rounded-full bg-amber-500" />
-              <div className="w-3 h-3 rounded-full bg-emerald-500" />
+    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pb-24 hidden md:block">
+      <div className="max-w-5xl mx-auto">
+        <div className="animate-hero-dashboard animate-dashboard-float">
+          <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl shadow-black/50">
+            {/* App Chrome */}
+            <div className="h-10 bg-[#050505] border-b border-white/[0.06] flex items-center justify-between px-4">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#ff5f57]" />
+                <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
+                <div className="w-3 h-3 rounded-full bg-[#28c840]" />
+              </div>
+              <div className="flex items-center gap-2 text-xs text-white/40">
+                <span>Dashboard</span>
+                <span className="text-white/20">/</span>
+                <span>Contracts</span>
+              </div>
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500" />
             </div>
-            <div className="hidden sm:flex items-center gap-2 text-sm text-slate-400">
-              <span>Dashboard</span>
-              <span className="text-slate-600">/</span>
-              <span>Overview</span>
+
+            {/* App Body */}
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-white font-medium text-lg">Contracts</h3>
+                <button className="h-9 px-4 text-sm font-medium bg-white text-black rounded-md hover:bg-white/90 transition-colors flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add Contract
+                </button>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/[0.06]">
+                      <th className="py-3 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-[40%]">
+                        Contract
+                      </th>
+                      <th className="py-3 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-[20%]">
+                        End Date
+                      </th>
+                      <th className="py-3 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-[15%]">
+                        Status
+                      </th>
+                      <th className="py-3 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-[15%]">
+                        Days Left
+                      </th>
+                      <th className="py-3 px-4 text-left text-[11px] font-medium uppercase tracking-wider text-white/40 w-[10%]">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contracts.map((contract, index) => (
+                      <tr key={index} className="border-b border-white/[0.04] last:border-0 hover:bg-white/[0.02] transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-lg bg-white/[0.06] flex items-center justify-center text-sm font-medium text-white/60">
+                              {contract.company.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-white/90">{contract.company}</div>
+                              <div className="text-xs text-white/40">{contract.contract}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-sm text-white/60">{contract.date}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[11px] font-medium ${
+                            contract.status === "active"
+                              ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20"
+                              : "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                          }`}>
+                            {contract.status === "active" ? "Active" : "Expiring"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-semibold text-white/90 w-8">{contract.daysLeft}</span>
+                            <div className="flex-1 max-w-[80px]">
+                              <div className={`h-1.5 rounded-full ${
+                                contract.status === "active" ? "bg-emerald-500/20" : "bg-amber-500/20"
+                              }`}>
+                                <div className={`h-full rounded-full ${
+                                  contract.status === "active" ? "bg-emerald-500" : "bg-amber-500"
+                                }`} style={{ width: `${Math.min((contract.daysLeft / 90) * 100, 100)}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <button className="w-8 h-8 rounded-lg hover:bg-white/[0.08] flex items-center justify-center text-white/40 hover:text-white/80 transition-colors">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-500 to-indigo-500" />
-          </div>
-
-          {/* App Body Header */}
-          <div className="p-6 sm:p-8 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="font-display text-xl sm:text-2xl font-bold text-slate-100">
-              Contract Overview
-            </h2>
-            <button className="inline-flex items-center gap-2 h-10 px-4 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-colors btn-lift w-fit focus-ring">
-              <Plus className="w-4 h-4" />
-              Add Contract
-            </button>
-          </div>
-
-          {/* Table */}
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full min-w-[600px]">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-2/5">
-                    Contract
-                  </th>
-                  <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-1/6">
-                    Date
-                  </th>
-                  <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-1/6">
-                    Status
-                  </th>
-                  <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-1/6">
-                    Days Left
-                  </th>
-                  <th className="py-3 px-4 text-left text-xs font-medium uppercase tracking-wider text-slate-500 w-auto">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.map((contract, index) => (
-                  <ContractRow key={index} {...contract} />
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -649,7 +679,7 @@ function FeatureCard({ icon, title, description, delay }: FeatureCardProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsVisible(true), 1000);
+    const timer = setTimeout(() => setIsVisible(true), ANIMATION_DELAY_VERY_LONG_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -2582,7 +2612,7 @@ function PainToSolutionSection() {
     if (painId !== activePain) {
       setIsTransitioning(true);
       setActivePain(painId);
-      setTimeout(() => setIsTransitioning(false), 600);
+      setTimeout(() => setIsTransitioning(false), TRANSITION_DELAY_MS);
     }
   };
 
@@ -3334,7 +3364,7 @@ function FloatingActionButton() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:hidden z-50 animate-fab-slide">
-      <Link href="/dashboard" className="w-full h-12 bg-cyan-600 text-slate-950 font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_-4px_20px_rgba(8,145,178,0.3)] animate-fab-pulse">
+      <Link href="/signup" className="w-full h-12 bg-cyan-600 text-slate-950 font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_-4px_20px_rgba(8,145,178,0.3)] animate-fab-pulse">
         Start Free Trial
         <ArrowRight className="w-4 h-4" />
       </Link>

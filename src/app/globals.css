@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@reference "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -197,6 +198,85 @@
 
 .animate-slide-down {
   animation: slideDown 600ms ease-out forwards;
+}
+
+/* ============================================
+   Horizontal KPI Cards Animations
+   ============================================ */
+
+/* Draw checkmark animation */
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Slide down animation for detail panel */
+@keyframes slideDownPanel {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Pulse ring animation */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Wave animation for waveform */
+@keyframes wave {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.2);
+  }
+}
+
+/* Waveform animation for KPI cards - continuous morph */
+@keyframes waveform {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+}
+
+/* Apply animations */
+.animate-drawCheck {
+  animation: drawCheck 400ms ease-out forwards;
+}
+
+.animate-slideDownPanel {
+  animation: slideDownPanel 300ms ease-out;
+}
+
+.animate-pulseRing {
+  animation: pulseRing 3s ease-in-out infinite;
+}
+
+.animate-wave {
+  animation: wave 1s ease-in-out infinite;
 }
 
 /* Staggered Reveal Animations */
@@ -432,6 +512,13 @@
   animation: rotateIn 300ms ease-out forwards;
 }
 
+/* Draw checkmark animation */
+@keyframes drawCheck {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
 /* Card lift hover effect */
 .card-hover-lift {
   transition: transform 300ms ease, box-shadow 300ms ease, border-color 300ms ease;
@@ -614,6 +701,186 @@
   stroke-dasharray: 24;
   stroke-dashoffset: 24;
   animation: checkDraw 400ms ease-out forwards;
+}
+
+/* ========================================
+   Hero Section - Professional Typography
+   ======================================== */
+
+/* Hero Staggered Word Reveal */
+@keyframes heroWordReveal {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-word {
+  opacity: 0;
+  animation: heroWordReveal 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Hero word stagger delays */
+.hero-word-1 { animation-delay: 400ms; }
+.hero-word-2 { animation-delay: 480ms; }
+.hero-word-3 { animation-delay: 560ms; }
+.hero-word-4 { animation-delay: 640ms; }
+.hero-word-5 { animation-delay: 720ms; }
+
+/* Underline draw animation */
+@keyframes underlineDraw {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-underline-draw {
+  animation: underlineDraw 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: 900ms;
+}
+
+/* Hero eyebrow fade up */
+@keyframes heroEyebrowReveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-eyebrow {
+  opacity: 0;
+  animation: heroEyebrowReveal 400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: 200ms;
+}
+
+/* Hero subheadline reveal */
+@keyframes heroSubheadlineReveal {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-subheadline {
+  opacity: 0;
+  animation: heroSubheadlineReveal 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: 800ms;
+}
+
+/* Hero CTA reveal with scale */
+@keyframes heroCTAReveal {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-hero-cta-primary {
+  opacity: 0;
+  animation: heroCTAReveal 300ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 1000ms;
+}
+
+.animate-hero-cta-secondary {
+  opacity: 0;
+  animation: heroCTAReveal 300ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 1100ms;
+}
+
+/* Hero microcopy fade */
+@keyframes heroMicrocopyReveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-hero-microcopy {
+  opacity: 0;
+  animation: heroMicrocopyReveal 300ms ease-out forwards;
+  animation-delay: 1200ms;
+}
+
+/* Dashboard preview reveal */
+@keyframes heroDashboardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-hero-dashboard {
+  opacity: 0;
+  animation: heroDashboardReveal 600ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation-delay: 1400ms;
+}
+
+/* Dashboard float animation */
+@keyframes dashboardFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-dashboard-float {
+  animation: dashboardFloat 6s ease-in-out infinite;
+  animation-delay: 2000ms;
+}
+
+/* Background dots drift */
+@keyframes dotsDrift {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 24px 24px;
+  }
+}
+
+.animate-dots-drift {
+  animation: dotsDrift 20s linear infinite;
+}
+
+/* Background fade in */
+@keyframes backgroundFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 0.08;
+  }
+}
+
+.animate-bg-fade {
+  animation: backgroundFadeIn 800ms ease-out forwards;
 }
 
 /* ========================================
@@ -4209,4 +4476,80 @@
 
 .form-step-exit {
   animation: formStepExit 200ms var(--ease-smooth) forwards;
+}
+
+/* ========================================
+   Enhanced Toast Animations (Top-Center)
+   ======================================== */
+
+@keyframes toastEnter {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastExit {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+.animate-toast-enter {
+  animation: toastEnter 300ms var(--ease-spring) forwards;
+}
+
+.animate-toast-exit {
+  animation: toastExit 200ms var(--ease-smooth) forwards;
+}
+
+.animate-toast-progress {
+  animation: toastProgress linear forwards;
+}
+
+/* ========================================
+   Validation Animations
+   ======================================== */
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 300ms ease-out;
+}
+
+/* ========================================
+   Zoom In Animation
+   ======================================== */
+
+@keyframes zoomIn95 {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.zoom-in-95 {
+  animation: zoomIn95 200ms var(--ease-smooth) forwards;
 }

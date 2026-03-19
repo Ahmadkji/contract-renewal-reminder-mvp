@@ -1,9 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { X } from "lucide-react"
 
+// ============================================
+// Slide Over Panel
+// ============================================
 interface SlideOverPanelProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -11,15 +14,7 @@ interface SlideOverPanelProps {
   description?: string
   children: React.ReactNode
   footer?: React.ReactNode
-  width?: "sm" | "md" | "lg" | "xl" | "full"
-}
-
-const widthClasses = {
-  sm: "max-w-md",
-  md: "max-w-lg",
-  lg: "max-w-xl",
-  xl: "max-w-2xl",
-  full: "max-w-3xl",
+  width?: "sm" | "md" | "lg" | "xl"
 }
 
 export function SlideOverPanel({
@@ -31,146 +26,124 @@ export function SlideOverPanel({
   footer,
   width = "lg",
 }: SlideOverPanelProps) {
-  // Close on escape key
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && open) {
-        onOpenChange(false)
-      }
-    }
-    document.addEventListener("keydown", handleEscape)
-    return () => document.removeEventListener("keydown", handleEscape)
-  }, [open, onOpenChange])
-
-  // Prevent body scroll when open
-  React.useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = ""
-    }
-    return () => {
-      document.body.style.overflow = ""
-    }
-  }, [open])
-
-  if (!open) return null
+  const widthClasses = {
+    sm: "max-w-sm",
+    md: "max-w-md",
+    lg: "max-w-lg",
+    xl: "max-w-xl",
+  }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <>
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm backdrop-enter"
+        className={cn(
+          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all duration-300",
+          open ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
         onClick={() => onOpenChange(false)}
-        aria-hidden="true"
       />
 
       {/* Panel */}
-      <div className="absolute inset-y-0 right-0 flex max-w-full pl-10">
-        <div
-          className={cn(
-            "w-screen slide-over-enter",
-            widthClasses[width]
-          )}
-        >
-          <div className="flex h-full flex-col bg-[#0a0a0a] border-l border-white/10 shadow-xl">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-              <div>
-                <h2 className="text-lg font-semibold text-white">{title}</h2>
-                {description && (
-                  <p className="mt-1 text-sm text-white/60">{description}</p>
-                )}
-              </div>
-              <button
-                onClick={() => onOpenChange(false)}
-                className="w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <div
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] bg-[#0a0a0a] border-t border-white/10 shadow-2xl rounded-t-2xl transition-transform duration-300 ease-out flex flex-col",
+          open ? "translate-y-0" : "translate-y-full"
+        )}
+      >
+        {/* Drag Handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 bg-white/20 rounded-full" />
+        </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 dashboard-scroll">
-              {children}
-            </div>
-
-            {/* Footer */}
-            {footer && (
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 bg-[#0a0a0a]">
-                {footer}
-              </div>
+        {/* Header */}
+        <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
+          <div>
+            <h2 className="text-lg font-semibold text-white">{title}</h2>
+            {description && (
+              <p className="text-sm text-white/50">{description}</p>
             )}
           </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
+
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-6 pb-20">
+          {children}
+        </div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="flex items-center gap-3 h-16 px-6 border-t border-white/10 bg-[#0a0a0a]">
+            {footer}
+          </div>
+        )}
       </div>
-    </div>
+    </>
   )
 }
 
-// Step indicator for multi-step forms
+// ============================================
+// Step Indicator
+// ============================================
+interface Step {
+  id: string
+  label: string
+}
+
 interface StepIndicatorProps {
-  steps: { id: string; label: string }[]
+  steps: Step[]
   currentStep: number
-  onStepClick?: (index: number) => void
+  onStepClick?: (step: number) => void
 }
 
 export function StepIndicator({ steps, currentStep, onStepClick }: StepIndicatorProps) {
   return (
-    <div className="flex items-center gap-2 mb-8">
-      {steps.map((step, index) => {
-        const isActive = index === currentStep
-        const isComplete = index < currentStep
-        const isClickable = onStepClick && index <= currentStep
-
-        return (
-          <React.Fragment key={step.id}>
-            {index > 0 && (
-              <div
-                className={cn(
-                  "w-10 h-0.5 transition-colors duration-300",
-                  isComplete ? "bg-[#22c55e]" : "bg-white/10"
-                )}
-              />
+    <div className="flex items-center gap-2 mb-6">
+      {steps.map((step, index) => (
+        <React.Fragment key={step.id}>
+          <button
+            type="button"
+            onClick={() => onStepClick?.(index)}
+            disabled={index > currentStep}
+            className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
+              index === currentStep
+                ? "bg-[#06b6d4]/20 text-[#06b6d4] border border-[#06b6d4]/30"
+                : index < currentStep
+                ? "bg-white/10 text-white border border-white/10"
+                : "text-white/40 border border-transparent cursor-not-allowed"
             )}
-            <button
-              onClick={() => isClickable && onStepClick?.(index)}
-              disabled={!isClickable}
+          >
+            <span
               className={cn(
-                "flex items-center gap-2 transition-all duration-200",
-                isClickable && "cursor-pointer"
+                "w-5 h-5 rounded-full flex items-center justify-center text-xs",
+                index === currentStep
+                  ? "bg-[#06b6d4] text-white"
+                  : index < currentStep
+                  ? "bg-[#22c55e] text-white"
+                  : "bg-white/10 text-white/40"
               )}
             >
-              <div
-                className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200",
-                  isActive && "bg-[#06b6d4]/20 border-2 border-[#06b6d4] text-[#06b6d4]",
-                  isComplete && "bg-[#22c55e] border-2 border-[#22c55e] text-white",
-                  !isActive && !isComplete && "bg-white/5 border border-white/10 text-white/40"
-                )}
-              >
-                {isComplete ? (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
-              </div>
-              <span
-                className={cn(
-                  "text-sm font-medium transition-colors duration-200 hidden sm:block",
-                  isActive && "text-white",
-                  isComplete && "text-white/80",
-                  !isActive && !isComplete && "text-white/40"
-                )}
-              >
-                {step.label}
-              </span>
-            </button>
-          </React.Fragment>
-        )
-      })}
+              {index < currentStep ? "✓" : index + 1}
+            </span>
+            <span className="hidden sm:inline">{step.label}</span>
+          </button>
+          {index < steps.length - 1 && (
+            <div
+              className={cn(
+                "flex-1 h-px mx-2",
+                index < currentStep ? "bg-[#06b6d4]/30" : "bg-white/10"
+              )}
+            />
+          )}
+        </React.Fragment>
+      ))}
     </div>
   )
 }

@@ -1,13 +1,3 @@
-import { PrismaClient } from '@prisma/client'
-
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined
-}
-
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ['query'],
-  })
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
+// Export proper Next.js 15 SSR clients for database operations
+export { createClient as createClientClient } from './supabase/client'
+export { createClient as createClientServer } from './supabase/server'

@@ -1,0 +1,508 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@reference "tailwindcss";
+
+@custom-variant dark (&:is(.dark *))
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-manrope);
+  --font-serif: var(--font-source-serif-4);
+  --font-mono: var(--font-jetbrains-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
+  --primary: #06b6d4;
+  --primary-foreground: #020617;
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #6366f1;
+  --accent-foreground: #f1f5f9;
+  --destructive: #ef4444;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #06b6d4;
+  --chart-1: #06b6d4;
+  --chart-2: #6366f1;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #06b6d4;
+  --sidebar-primary-foreground: #020617;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f1f5f9;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #06b6d4;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
+  --primary: #06b6d4;
+  --primary-foreground: #020617;
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #6366f1;
+  --accent-foreground: #f1f5f9;
+  --destructive: #ef4444;
+  --border: #1e293b;
+  --input: #1e293b;
+  --ring: #06b6d4;
+  --chart-1: #06b6d4;
+  --chart-2: #6366f1;
+  --chart-3: #10b981;
+  --chart-4: #f59e0b;
+  --chart-5: #ef4444;
+  --sidebar: #0f172a;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #06b6d4;
+  --sidebar-primary-foreground: #020617;
+  --sidebar-accent: #1e293b;
+  --sidebar-accent-foreground: #f1f5f9;
+  --sidebar-border: #1e293b;
+  --sidebar-ring: #06b6d4;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* ========================================
+    Font System - "The Human Professional"
+    Warm, approachable, premium but friendly
+    ======================================== */
+
+/* Display/Hero - Manrope 700-800: Headlines, section titles */
+.font-display {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 700;
+}
+
+.font-display-bold {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 800;
+}
+
+/* Body - Source Serif 4 400: Long paragraphs, testimonials */
+.font-body {
+  font-family: var(--font-source-serif-4), serif;
+  font-weight: 400;
+}
+
+.font-body-italic {
+  font-family: var(--font-source-serif-4), serif;
+  font-weight: 400;
+  font-style: italic;
+}
+
+/* UI/Labels - JetBrains Mono 500: Buttons, navigation, data */
+.font-mono-data {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-weight: 500;
+}
+
+/* UI text - Manrope for buttons and navigation */
+.font-ui {
+  font-family: var(--font-manrope), sans-serif;
+  font-weight: 500;
+}
+
+/* ========================================
+    Optimized Animations (Consolidated)
+    ======================================== */
+
+/* Dotted Background System */
+.dotted-background {
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, #334155 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.15;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Navbar Slide Down Animation */
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 600ms ease-out forwards;
+}
+
+/* Fade Up Animation (Consolidated) */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 800ms ease-out forwards;
+}
+
+/* Scale In Animation */
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scaleIn 400ms ease-out forwards;
+}
+
+/* Pulse Ring Animation */
+@keyframes pulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulseRing 3s ease-in-out infinite;
+}
+
+/* Wave Animation */
+@keyframes wave {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.6);
+  }
+}
+
+.animate-wave {
+  animation: wave 1s ease-in-out infinite;
+}
+
+/* Draw Check Animation */
+@keyframes drawCheck {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw-check {
+  animation: drawCheck 400ms ease-out forwards;
+}
+
+/* Draw Line Animation */
+@keyframes drawLine {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-draw-line {
+  animation: drawLine 2s ease-out forwards;
+}
+
+/* Rotate Animation */
+@keyframes rotateIn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+.animate-rotate-180 {
+  animation: rotateIn 300ms ease-out forwards;
+}
+
+/* Float Animation */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(3deg);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Pulse Glow Animation */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(6, 182, 212, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ========================================
+    Stagger Delays (Optimized)
+    ======================================== */
+
+.stagger-1 { animation-delay: 0ms; }
+.stagger-2 { animation-delay: 200ms; }
+.stagger-3 { animation-delay: 400ms; }
+.stagger-4 { animation-delay: 600ms; }
+.stagger-5 { animation-delay: 800ms; }
+.stagger-6 { animation-delay: 1000ms; }
+
+.card-stagger-1 { animation-delay: 0ms; }
+.card-stagger-2 { animation-delay: 100ms; }
+.card-stagger-3 { animation-delay: 200ms; }
+
+/* ========================================
+    Utility Classes (Consolidated)
+    ======================================== */
+
+/* Glass Effect */
+.glass {
+  background: rgba(2, 6, 23, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Gradient Text */
+.gradient-text {
+  background: linear-gradient(135deg, #06b6d4 0%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow Effect */
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.glow-cyan:hover {
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.5);
+}
+
+/* Button Lift Effect */
+.btn-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.btn-lift:hover {
+  transform: translateY(-2px);
+}
+
+/* Card Border Transition */
+.card-border-transition {
+  transition: border-color 300ms ease;
+}
+
+/* Focus Ring */
+.focus-ring {
+  @apply focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-950;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Progress Bar Colors */
+.progress-emerald {
+  --progress-background: rgba(16, 185, 129, 0.2);
+  --progress-indicator: #10b981;
+}
+
+.progress-amber {
+  --progress-background: rgba(245, 158, 11, 0.2);
+  --progress-indicator: #f59e0b;
+}
+
+/* Initial States */
+.animate-hidden {
+  opacity: 0;
+}
+
+.stagger-hidden {
+  opacity: 0;
+}
+
+.navbar-init {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+/* Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================
+    Landing Page Specific Animations
+    ======================================== */
+
+/* Hero Word Animation */
+.hero-word-1 { animation-delay: 0ms; }
+.hero-word-2 { animation-delay: 100ms; }
+.hero-word-3 { animation-delay: 200ms; }
+.hero-word-4 { animation-delay: 300ms; }
+.hero-word-5 { animation-delay: 400ms; }
+
+/* Hero Eyebrow */
+.animate-hero-eyebrow {
+  animation: fadeUp 600ms ease-out forwards;
+  animation-delay: 200ms;
+}
+
+/* Hero Subheadline */
+.animate-hero-subheadline {
+  animation: fadeUp 600ms ease-out forwards;
+  animation-delay: 400ms;
+}
+
+/* Hero CTA Primary */
+.animate-hero-cta-primary {
+  animation: fadeUp 600ms ease-out forwards;
+  animation-delay: 600ms;
+}
+
+/* Hero CTA Secondary */
+.animate-hero-cta-secondary {
+  animation: fadeUp 600ms ease-out forwards;
+  animation-delay: 700ms;
+}
+
+/* Hero Microcopy */
+.animate-hero-microcopy {
+  animation: fadeUp 600ms ease-out forwards;
+  animation-delay: 800ms;
+}
+
+/* Underline Draw Animation */
+@keyframes underlineDraw {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+.animate-underline-draw {
+  animation: underlineDraw 1s ease-out forwards;
+  animation-delay: 500ms;
+}
+
+/* Navbar Progress */
+.nav-progress {
+  transition: width 50ms linear;
+}

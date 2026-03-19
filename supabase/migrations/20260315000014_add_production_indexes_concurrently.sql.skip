@@ -1,0 +1,81 @@
+-- ============================================
+-- Migration: Add Production Indexes Concurrently
+-- Description: Create indexes with CONCURRENTLY to avoid table locks in production
+-- IMPORTANT: Run this migration separately after initial schema is deployed
+-- Reference: https://supabase.com/docs/guides/database/postgres/indexes
+-- "the default behaviour of create index is to lock the table from writes. 
+--  Luckily Postgres provides us with create index concurrently which prevents blocking writes"
+-- ============================================
+
+-- Note: CONCURRENTLY cannot be used with IF NOT EXISTS
+-- We drop indexes first to ensure clean creation
+
+-- Drop existing indexes (if they exist)
+DROP INDEX IF EXISTS idx_contracts_name_gin;
+DROP INDEX IF EXISTS idx_contracts_vendor_gin;
+DROP INDEX IF EXISTS idx_contracts_user_id_end_date;
+DROP INDEX IF EXISTS idx_contracts_type;
+DROP INDEX IF EXISTS idx_reminders_days_before;
+DROP INDEX IF EXISTS idx_vendor_contacts_contact_name;
+DROP INDEX IF EXISTS idx_contracts_user_id_auto_renew;
+DROP INDEX IF EXISTS idx_contracts_user_id_type;
+DROP INDEX IF EXISTS idx_contracts_value;
+
+-- ============================================
+-- GIN Indexes for Text Search
+-- ============================================
+
+-- Create GIN index for contracts.name (case-insensitive search)
+CREATE INDEX CONCURRENTLY idx_contracts_name_gin 
+ON contracts USING gin (name gin_trgm_ops);
+
+-- Create GIN index for contracts.vendor (case-insensitive search)
+CREATE INDEX CONCURRENTLY idx_contracts_vendor_gin 
+ON contracts USING gin (vendor gin_trgm_ops);
+
+-- ============================================
+-- Composite Indexes for Multi-Column Queries
+-- ============================================
+
+-- Create composite index for user_id + end_date filtering
+-- Optimizes queries like: WHERE user_id = $1 AND end_date > $2
+CREATE INDEX CONCURRENTLY idx_contracts_user_id_end_date 
+ON contracts(user_id, end_date);
+
+-- Create composite index for user_id + auto_renew filtering
+-- Optimizes queries like: WHERE user_id = $1 AND auto_renew = $2
+CREATE INDEX CONCURRENTLY idx_contracts_user_id_auto_renew 
+ON contracts(user_id, auto_renew);
+
+-- Create composite index for user_id + type filtering
+-- Optimizes queries like: WHERE user_id = $1 AND type = $2
+CREATE INDEX CONCURRENTLY idx_contracts_user_id_type 
+ON contracts(user_id, type);
+
+-- ============================================
+-- Single Column Indexes for Filtering
+-- ============================================
+
+-- Create index for contracts.type filtering
+-- Optimizes queries like: WHERE type = $1
+CREATE INDEX CONCURRENTLY idx_contracts_type 
+ON contracts(type);
+
+-- Create index for reminders.days_before filtering
+-- Optimizes queries like: WHERE days_before = $1
+CREATE INDEX CONCURRENTLY idx_reminders_days_before 
+ON reminders(days_before);
+
+-- Create index for vendor_contacts.contact_name search
+-- Optimizes queries like: WHERE contact_name LIKE $1
+CREATE INDEX CONCURRENTLY idx_vendor_contacts_contact_name 
+ON vendor_contacts(contact_name);
+
+-- ============================================
+-- Partial Index for Financial Queries
+-- ============================================
+
+-- Create partial index for contracts.value (only non-null values)
+-- Optimizes queries like: WHERE value IS NOT NULL ORDER BY value
+CREATE INDEX CONCURRENTLY idx_contracts_value 
+ON contracts(value) WHERE value IS NOT NULL;

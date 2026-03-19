@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Manrope, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -52,11 +53,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${manrope.variable} ${sourceSerif4.variable} ${jetBrainsMono.variable} antialiased bg-slate-950 text-slate-100 font-sans`}
-      >
-        {children}
-        <Toaster />
-      </body>
+         className={`${manrope.variable} ${sourceSerif4.variable} ${jetBrainsMono.variable} antialiased bg-slate-950 text-slate-100 font-sans`}
+       >
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+          <Toaster />
+       </body>
     </html>
   );
 }

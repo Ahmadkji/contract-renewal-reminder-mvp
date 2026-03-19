@@ -1,0 +1,21 @@
+-- ============================================
+-- Migration: Create Views
+-- Description: Computed statistics view for contract analytics
+-- ============================================
+
+-- View: Contract statistics aggregated by user
+-- FIX: Removed auth.uid() from SELECT clause and WHERE clause to fix performance and correctness issues
+-- The view now returns stats for ALL users, grouped by user_id
+-- Usage: SELECT * FROM contract_stats WHERE user_id = auth.uid();
+CREATE OR REPLACE VIEW contract_stats AS
+SELECT
+  user_id,
+  COUNT(*) as total_contracts,
+  COUNT(*) FILTER (WHERE CURRENT_DATE > end_date) as expired,
+  COUNT(*) FILTER (WHERE end_date - CURRENT_DATE <= 7  AND CURRENT_DATE <= end_date) as critical,
+  COUNT(*) FILTER (WHERE end_date - CURRENT_DATE <= 30 AND end_date - CURRENT_DATE > 7) as expiring,
+  COUNT(*) FILTER (WHERE end_date - CURRENT_DATE > 30) as active,
+  SUM(value) as total_value,
+  AVG(value) as average_value
+FROM contracts
+GROUP BY user_id;

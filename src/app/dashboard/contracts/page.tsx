@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -9,7 +8,10 @@ import {
   Download,
   MoreHorizontal,
 } from "lucide-react";
+import { useState, useEffect, memo, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
+import { ANIMATION_DELAY_MS } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 
 // ============================================
 // Types
@@ -26,58 +28,69 @@ interface Contract {
 }
 
 // ============================================
-// Mock Data
+// API fetch function (client-safe)
 // ============================================
-const MOCK_CONTRACTS: Contract[] = [
-  { id: "1", name: "Enterprise License", vendor: "Acme Corp", type: "license", expiryDate: "Dec 15, 2024", daysLeft: 45, status: "active", value: 24000 },
-  { id: "2", name: "Support Contract", vendor: "TechStart Inc", type: "support", expiryDate: "Dec 28, 2024", daysLeft: 22, status: "expiring", value: 8400 },
-  { id: "3", name: "Cloud Services", vendor: "Startup Hub", type: "subscription", expiryDate: "Nov 30, 2024", daysLeft: 5, status: "critical", value: 12000 },
-  { id: "4", name: "Annual License", vendor: "Global Systems", type: "license", expiryDate: "Jan 5, 2025", daysLeft: 66, status: "active", value: 36000 },
-  { id: "5", name: "Consulting Services", vendor: "DataPro Ltd", type: "service", expiryDate: "Dec 10, 2024", daysLeft: 38, status: "renewing", value: 18000 },
-  { id: "6", name: "Software Maintenance", vendor: "TechCorp", type: "support", expiryDate: "Feb 15, 2025", daysLeft: 107, status: "active", value: 9600 },
-  { id: "7", name: "Cloud Storage Pro", vendor: "CloudSpace", type: "subscription", expiryDate: "Jan 20, 2025", daysLeft: 81, status: "active", value: 4800 },
-  { id: "8", name: "Security Suite", vendor: "SecureNet", type: "license", expiryDate: "Dec 5, 2024", daysLeft: 15, status: "expiring", value: 15000 },
-];
+async function fetchContracts(page: number = 1, limit: number = 50): Promise<{ contracts: Contract[]; total: number }> {
+  const response = await fetch(`/api/contracts?page=${page}&limit=${limit}`, {
+    headers: {
+      'Origin': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+    }
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to fetch contracts');
+  }
+  
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to fetch contracts');
+  }
+  
+  return {
+    contracts: result.data,
+    total: result.pagination.total
+  };
+}
 
 // ============================================
-// Contracts Page Content
+// Contracts Page Component
 // ============================================
-export default function ContractsPageContent() {
-  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [visible, setVisible] = useState(false);
+export default function ContractsPage() {
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Animation
   useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100);
-    return () => clearTimeout(timer);
+    async function loadContracts() {
+      try {
+        const data = await fetchContracts(1, 50);
+        setContracts(data.contracts);
+      } catch (error) {
+        logger.error("Failed to load contracts:", error, 'ContractsPage');
+        toast({
+          title: "Error",
+          description: "Failed to load contracts",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadContracts();
   }, []);
 
-  // Listen for contract updates
-  useEffect(() => {
-    const handleUpdate = () => {
-      // In a real app, this would refetch data
-      console.log("Contracts updated");
-    };
-    window.addEventListener('contracts-updated', handleUpdate);
-    return () => window.removeEventListener('contracts-updated', handleUpdate);
-  }, []);
-
-  // Handle contract click - calls the global function from layout
-  const handleContractClick = (contractId: string) => {
+  const handleContractClick = useCallback((contractId: string) => {
     if ((window as any).openContractDetail) {
       (window as any).openContractDetail(contractId);
     }
-  };
+  }, []);
 
-  // Filter contracts
-  const filteredContracts = contracts.filter(contract => {
-    const matchesSearch = contract.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          contract.vendor.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === "all" || contract.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-8">
+        <div className="text-center text-[#a3a3a3]">Loading contracts...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -92,44 +105,11 @@ export default function ContractsPageContent() {
       </div>
 
       {/* Toolbar */}
-      <div className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-500 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a3a3a3]" />
-          <input
-            type="text"
-            placeholder="Search contracts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white placeholder-[#a3a3a3] focus:outline-none focus:border-[#06b6d4] focus:ring-2 focus:ring-[#06b6d4]/20 transition-all"
-          />
-        </div>
-
-        {/* Filter & Export */}
-        <div className="flex items-center gap-2">
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="h-10 px-3 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-[#06b6d4] transition-all"
-          >
-            <option value="all">All Status</option>
-            <option value="active">Active</option>
-            <option value="expiring">Expiring</option>
-            <option value="critical">Critical</option>
-            <option value="renewing">Renewing</option>
-          </select>
-
-          <button className="h-10 px-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-[#a3a3a3] hover:text-white hover:border-white/20 transition-all flex items-center gap-2">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
-        </div>
-      </div>
+      <ContractsToolbar />
 
       {/* Contracts Table */}
       <ContractsTable 
-        contracts={filteredContracts}
-        visible={visible}
+        contracts={contracts}
         onContractClick={handleContractClick}
       />
     </div>
@@ -137,18 +117,69 @@ export default function ContractsPageContent() {
 }
 
 // ============================================
+// Contracts Toolbar Component
+// ============================================
+function ContractsToolbar() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [visible, setVisible] = useState(false);
+
+  // Animation
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), ANIMATION_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-500 ${
+      visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+    }`}>
+      {/* Search */}
+      <div className="relative flex-1">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a3a3a3]" />
+        <input
+          type="text"
+          placeholder="Search contracts..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full h-10 pl-10 pr-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white placeholder-[#a3a3a3] focus:outline-none focus:border-[#06b6d4] focus:ring-2 focus:ring-[#06b6d4]/20 transition-all"
+        />
+      </div>
+
+      {/* Filter & Export */}
+      <div className="flex items-center gap-2">
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+          className="h-10 px-3 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-[#06b6d4] transition-all"
+        >
+          <option value="all">All Status</option>
+          <option value="active">Active</option>
+          <option value="expiring">Expiring</option>
+          <option value="critical">Critical</option>
+          <option value="renewing">Renewing</option>
+        </select>
+
+        <button className="h-10 px-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-[#a3a3a3] hover:text-white hover:border-white/20 transition-all flex items-center gap-2">
+          <Download className="w-4 h-4" />
+          Export
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Contracts Table Component
 // ============================================
-function ContractsTable({ 
+const ContractsTable = memo(function ContractsTable({ 
   contracts, 
-  visible,
   onContractClick 
 }: { 
   contracts: Contract[];
-  visible: boolean;
   onContractClick: (id: string) => void;
 }) {
-  const getStatusColor = (status: Contract["status"]) => {
+  const getStatusColor = useCallback((status: Contract["status"]) => {
     switch (status) {
       case "active": return "bg-[#22c55e]";
       case "expiring": return "bg-[#eab308]";
@@ -156,9 +187,9 @@ function ContractsTable({
       case "renewing": return "bg-[#3b82f6]";
       default: return "bg-[#22c55e]";
     }
-  };
+  }, []);
 
-  const getStatusBadge = (status: Contract["status"]) => {
+  const getStatusBadge = useCallback((status: Contract["status"]) => {
     switch (status) {
       case "active": return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
       case "expiring": return { bg: "bg-[#eab308]/20", text: "text-[#eab308]", label: "Expiring" };
@@ -166,9 +197,9 @@ function ContractsTable({
       case "renewing": return { bg: "bg-[#3b82f6]/20", text: "text-[#3b82f6]", label: "Renewing" };
       default: return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
     }
-  };
+  }, []);
 
-  const getTypeLabel = (type: Contract["type"]) => {
+  const getTypeLabel = useCallback((type: Contract["type"]) => {
     switch (type) {
       case "license": return "License";
       case "service": return "Service";
@@ -176,20 +207,15 @@ function ContractsTable({
       case "subscription": return "Subscription";
       default: return type;
     }
-  };
+  }, []);
 
-  const formatValue = (value?: number) => {
+  const formatValue = useCallback((value?: number) => {
     if (!value) return "-";
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
-  };
+  }, []);
 
   return (
-    <div
-      className={`bg-[#141414] border border-white/[0.08] rounded-xl overflow-hidden transition-all duration-500 ${
-        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-      }`}
-      style={{ transitionDelay: "100ms" }}
-    >
+    <div className="bg-[#141414] border border-white/[0.08] rounded-xl overflow-hidden">
       {/* Table Header */}
       <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 border-b border-white/[0.08] text-xs font-medium text-[#a3a3a3] uppercase tracking-wider">
         <div className="col-span-4">Contract</div>
@@ -287,4 +313,4 @@ function ContractsTable({
       )}
     </div>
   );
-}
+});

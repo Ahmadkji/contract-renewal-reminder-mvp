@@ -1,0 +1,16 @@
+-- ============================================
+-- Migration: Fix Reminders Table Columns
+-- Description: Add missing columns to match application code expectations
+-- BUG FIX: Application code queries for 'reminder_days' and 'email_reminders'
+-- but these columns don't exist in the database schema.
+-- This migration adds these columns to prevent query failures.
+-- ============================================
+
+-- Add reminder_days column (alias for days_before for better clarity)
+ALTER TABLE reminders ADD COLUMN IF NOT EXISTS reminder_days INTEGER;
+
+-- Add email_reminders boolean column (controls whether email reminders are enabled)
+ALTER TABLE reminders ADD COLUMN IF NOT EXISTS email_reminders BOOLEAN DEFAULT false;
+
+-- Copy data from days_before to reminder_days for existing rows
+UPDATE reminders SET reminder_days = days_before WHERE reminder_days IS NULL;
