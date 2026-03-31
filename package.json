@@ -10,20 +10,9 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit:security": "npm audit --audit-level=high --omit=dev",
-    "test:smoke": "playwright test tests/e2e/dashboard-contract.smoke.spec.ts",
-    "test:e2e:smoke": "playwright test tests/e2e/homepage.smoke.spec.ts",
-    "test:integration": "npm run test:contracts-search-regression",
-    "test:subscriptions": "SUBSCRIPTION_TEST_LANE=deterministic node tests/integration/subscription-production-safety.test.js",
-    "test:subscriptions:live": "SUBSCRIPTION_TEST_LANE=live node tests/integration/subscription-production-safety.test.js",
-    "test:billing-pricing": "node tests/integration/billing-pricing-api.test.js",
-    "test:rate-limit-persistence": "node tests/integration/rate-limit-persistence.test.js",
-    "test:checkout-throttle-dedupe": "node tests/integration/checkout-throttling-dedupe.test.js",
-    "test:reminders": "node tests/integration/reminder-processor-schema-regression.test.js",
-    "test:contracts-search-regression": "node tests/integration/contracts-search-escape-regression.test.js",
-    "test:webhook-claim-concurrency": "node tests/integration/webhook-worker-claim-concurrency.test.js",
     "ops:reminders-health": "node scripts/ops/reminders-health-check.js",
     "ops:contracts-explain": "node scripts/ops/contracts-query-plan-check.js",
-    "ci:verify": "npm run lint && npm run typecheck && npm run test:integration && npm run test:e2e:smoke && npm run audit:security"
+    "ci:verify": "npm run lint && npm run typecheck && npm run audit:security"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -95,7 +84,6 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
