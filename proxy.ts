@@ -62,22 +62,36 @@ export async function proxy(request: NextRequest) {
     const supabase = await createSupabaseServerClient(request)
     
     // Prefer claims verification for route protection at the network boundary.
-    const getClaims = (supabase.auth as unknown as {
-      getClaims?: () => Promise<{ data: { claims?: Record<string, unknown> | null }; error: { message: string } | null }>
-    }).getClaims
-
     let isAuthenticated = false
+    const authWithClaims = supabase.auth as unknown as {
+      getClaims?: () => Promise<{
+        data: { claims?: Record<string, unknown> | null }
+        error: { message: string } | null
+      }>
+    }
 
-    if (typeof getClaims === 'function') {
-      const { data, error } = await getClaims()
-      if (error) {
-        console.warn('[Proxy] getClaims error:', error.message)
+    if (typeof authWithClaims.getClaims === 'function') {
+      try {
+        // Call as a method to preserve auth instance binding.
+        const { data, error } = await authWithClaims.getClaims()
+        if (error) {
+          console.warn('[Proxy] getClaims error:', error.message)
+        }
+
+        const claims = data?.claims || null
+        isAuthenticated = Boolean(
+          claims && typeof claims.sub === 'string' && claims.sub.length > 0
+        )
+      } catch (claimsError) {
+        console.warn('[Proxy] getClaims threw, falling back to getUser:', claimsError)
       }
+    }
 
-      const claims = data?.claims || null
-      isAuthenticated = Boolean(claims && typeof claims.sub === 'string' && claims.sub.length > 0)
-    } else {
-      const { data: { user }, error } = await supabase.auth.getUser()
+    if (!isAuthenticated) {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser()
       if (error) {
         console.warn('[Proxy] getUser fallback error:', error.message)
       }
