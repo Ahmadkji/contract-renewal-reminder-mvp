@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { env } from '@/lib/env'
 
 const PUBLIC_PAGE_EXACT_ROUTES = new Set([
@@ -53,13 +52,15 @@ export async function proxy(request: NextRequest) {
 
   // Protected pages - validate session from request cookies
   try {
+    const response = continueRequest(request, requestId)
+
     if (!hasRequestCookies) {
       console.warn('[Proxy] Missing Supabase session cookie')
       return getLoginRedirect(request, pathname, requestId)
     }
 
     // Create Supabase client and pass the incoming request
-    const supabase = await createSupabaseServerClient(request)
+    const supabase = createSupabaseServerClient(request, response)
     
     // Prefer claims verification for route protection at the network boundary.
     let isAuthenticated = false
@@ -104,7 +105,7 @@ export async function proxy(request: NextRequest) {
     }
 
     // User authenticated - allow access
-    return continueRequest(request, requestId)
+    return response
   } catch (error) {
     console.error('[Proxy] Unexpected error during session validation:', error)
     return getLoginRedirect(request, pathname, requestId)
@@ -169,43 +170,26 @@ function getLoginRedirect(request: NextRequest, pathname: string, requestId: str
 /**
  * Create Supabase server client that reads cookies from the incoming request
  */
-async function createSupabaseServerClient(request: NextRequest) {
-  // Get cookie store for setting cookies (server-side)
-  const cookieStore = await cookies()
-  
+function createSupabaseServerClient(request: NextRequest, response: NextResponse) {
   return createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
     env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
-          // Read from the INCOMING REQUEST headers (the cookies the browser sent)
-          const cookieHeader = request.headers.get('cookie')
-          if (!cookieHeader) return []
-          
-          return cookieHeader.split(';').reduce((cookies, part) => {
-            const [name, ...rest] = part.trim().split('=')
-            if (name) {
-              cookies.push({
-                name,
-                value: rest.join('=')
-              })
-            }
-            return cookies
-          }, [] as { name: string; value: string }[])
+          return request.cookies.getAll().map(({ name, value }) => ({ name, value }))
         },
         setAll(cookiesToSet) {
-          // For middleware, we mainly read cookies, but handle setAll if needed
           cookiesToSet.forEach(({ name, value, options }) => {
             try {
-              cookieStore.set(name, value, {
+              request.cookies.set(name, value)
+              response.cookies.set(name, value, {
                 ...options,
                 httpOnly: options?.httpOnly ?? true,
                 secure: options?.secure ?? process.env.NODE_ENV === 'production',
-                sameSite: options?.sameSite ?? 'lax'
+              sameSite: options?.sameSite ?? 'lax'
               })
             } catch (_error) {
-              // Ignore cookie setting errors in middleware
               console.warn('[Proxy] Could not set cookie:', name)
             }
           })
