@@ -60,6 +60,32 @@ function parseConfiguredOrigins(value: string | undefined): string[] {
     .filter((item) => item.length > 0)
 }
 
+function getFirstHeaderValue(value: string | null): string | null {
+  if (!value) {
+    return null
+  }
+
+  const firstValue = value.split(',')[0]?.trim()
+  return firstValue && firstValue.length > 0 ? firstValue : null
+}
+
+function getRequestOrigin(request: NextRequest): string | null {
+  const forwardedProto = getFirstHeaderValue(request.headers.get('x-forwarded-proto'))
+  const forwardedHost = getFirstHeaderValue(request.headers.get('x-forwarded-host'))
+
+  if (forwardedProto && forwardedHost) {
+    return normalizeOrigin(`${forwardedProto}://${forwardedHost}`)
+  }
+
+  const host = getFirstHeaderValue(request.headers.get('host'))
+  if (host) {
+    const protocol = request.nextUrl.protocol || 'https:'
+    return normalizeOrigin(`${protocol}//${host}`)
+  }
+
+  return normalizeOrigin(request.nextUrl.origin)
+}
+
 function buildAllowedOrigins(): Set<string> {
   const allowedOrigins = new Set<string>()
   const configuredOrigins = parseConfiguredOrigins(env.CSRF_TRUSTED_ORIGINS)
@@ -126,6 +152,11 @@ export function validateOrigin(request: NextRequest): boolean {
   const normalizedOrigin = normalizeOrigin(origin)
   if (!normalizedOrigin) {
     return false
+  }
+
+  const requestOrigin = getRequestOrigin(request)
+  if (requestOrigin && normalizedOrigin === requestOrigin) {
+    return true
   }
 
   // Validate Origin header against allowed origins
