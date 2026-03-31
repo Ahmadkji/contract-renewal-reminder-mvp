@@ -33,7 +33,7 @@ export async function proxy(request: NextRequest) {
   const requestId = getOrCreateRequestId(request)
   const pathname = normalizePathname(request.nextUrl.pathname)
   const isApiRequest = isApiPath(pathname)
-  const hasRequestCookies = hasRequestCookiesHeader(request)
+  const hasSupabaseSessionCookie = hasSupabaseSessionCookieInRequest(request)
   const isPublicPageRoute = PUBLIC_PAGE_EXACT_ROUTES.has(pathname)
   const isPublicApiRoute =
     isApiRequest &&
@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
   try {
     const response = continueRequest(request, requestId)
 
-    if (!hasRequestCookies) {
+    if (!hasSupabaseSessionCookie) {
       console.warn('[Proxy] Missing Supabase session cookie')
       return getLoginRedirect(request, pathname, requestId)
     }
@@ -89,14 +89,24 @@ export async function proxy(request: NextRequest) {
     }
 
     if (!isAuthenticated) {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error) {
-        console.warn('[Proxy] getUser fallback error:', error.message)
+      try {
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser()
+        if (error) {
+          console.warn('[Proxy] getUser fallback error:', error.message)
+        }
+        isAuthenticated = Boolean(user)
+      } catch (getUserError) {
+        // Avoid redirect loops when auth helpers throw on malformed/legacy cookies.
+        // Page-level auth checks still enforce protection.
+        console.warn(
+          '[Proxy] getUser fallback threw; deferring auth validation to page:',
+          getUserError
+        )
+        return response
       }
-      isAuthenticated = Boolean(user)
     }
 
     if (!isAuthenticated) {
@@ -107,8 +117,10 @@ export async function proxy(request: NextRequest) {
     // User authenticated - allow access
     return response
   } catch (error) {
+    // Keep request flowing and let page/API-level auth guards decide.
+    // This prevents hard redirect loops from middleware-only failures.
     console.error('[Proxy] Unexpected error during session validation:', error)
-    return getLoginRedirect(request, pathname, requestId)
+    return continueRequest(request, requestId)
   }
 }
 
@@ -123,9 +135,10 @@ function isApiPath(pathname: string): boolean {
   return pathname === '/api' || pathname.startsWith('/api/')
 }
 
-function hasRequestCookiesHeader(request: NextRequest): boolean {
-  const cookieHeader = request.headers.get('cookie')
-  return Boolean(cookieHeader && cookieHeader.trim().length > 0)
+function hasSupabaseSessionCookieInRequest(request: NextRequest): boolean {
+  return request.cookies
+    .getAll()
+    .some(({ name }) => name.includes('-auth-token'))
 }
 
 function parseRequestId(value: string | null): string | null {

@@ -322,9 +322,27 @@ export async function login(formData: FormData) {
       }
       throw mapSupabaseError(error)
     }
-    
-    // 3. Cookies are set in response headers by Supabase. Avoid extra getSession()
-    // round-trips here to keep login path fast under burst load.
+
+    if (!data.user || !data.session) {
+      console.error('[Login] Missing session or user after successful signInWithPassword')
+      return {
+        success: false,
+        error: 'Unable to establish a login session. Please try again.'
+      }
+    }
+
+    const cookieStore = await cookies()
+    const hasAuthCookie = cookieStore
+      .getAll()
+      .some((cookie) => cookie.name.includes('-auth-token'))
+
+    if (!hasAuthCookie) {
+      console.error('[Login] Supabase sign-in succeeded but auth cookie was not written')
+      return {
+        success: false,
+        error: 'Login did not complete correctly. Please try again.'
+      }
+    }
 
     // 4. Return success with user data for client navigation
     return { 
