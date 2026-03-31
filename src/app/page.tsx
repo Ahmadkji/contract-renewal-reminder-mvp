@@ -59,6 +59,41 @@ import {
   ANIMATION_DELAY_VERY_LONG_MS,
   TRANSITION_DELAY_MS,
 } from "@/lib/constants";
+import { SITE_URL } from "@/lib/site-url";
+import { FAQ_ITEMS, SOCIAL_PROOF_TESTIMONIALS } from "@/components/landing/homepage-static-content";
+
+const HOMEPAGE_STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "Renewly",
+      url: SITE_URL,
+      logo: `${SITE_URL}/logo.svg`,
+      description:
+        "Renewly helps small teams track contracts and avoid missed renewal deadlines.",
+    },
+    {
+      "@type": "WebSite",
+      name: "Renewly",
+      url: SITE_URL,
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "Renewly",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: SITE_URL,
+      description:
+        "A contract renewal tracker for small teams with reminders, deadline views, and renewal workflows.",
+      featureList: [
+        "Contract renewal tracking dashboard",
+        "Renewal reminder emails",
+        "Renewal status and due-date visibility",
+      ],
+    },
+  ],
+};
 
 // Custom hook for intersection observer scroll reveal
 function useScrollReveal(threshold = 0.1) {
@@ -315,62 +350,276 @@ function useTypingEffect(text: string, speed: number = 50, delay: number = 0) {
   return { displayedText, isTyping, isComplete, showCursor };
 }
 
-// Hero Section Component - Professional Typography-First Design
+// Hero Section Component - Golden Constellation
 function HeroSection() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    type Node = {
+      x: number;
+      y: number;
+      radius: number;
+      alpha: number;
+      pulse: number;
+      speed: number;
+      vx: number;
+      vy: number;
+      hue: number;
+    };
+
+    let width = 1;
+    let height = 1;
+    let nodes: Node[] = [];
+    let isInView = true;
+
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const createNodes = (count: number, w: number, h: number): Node[] =>
+      Array.from({ length: count }, () => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        radius: Math.random() * 2.2 + 0.6,
+        alpha: Math.random() * 0.7 + 0.2,
+        pulse: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.018 + 0.008,
+        vx: (Math.random() - 0.5) * 0.2,
+        vy: (Math.random() - 0.5) * 0.2,
+        hue: Math.random() * 20 + 38,
+      }));
+
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      width = Math.max(1, Math.floor(rect.width));
+      height = Math.max(1, Math.floor(rect.height));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const nodeCount = width < 640 ? 55 : width < 1024 ? 75 : 90;
+      nodes = createNodes(nodeCount, width, height);
+    };
+
+    const draw = () => {
+      context.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const distance = Math.hypot(dx, dy);
+          if (distance < 130) {
+            context.beginPath();
+            context.moveTo(nodes[i].x, nodes[i].y);
+            context.lineTo(nodes[j].x, nodes[j].y);
+            context.strokeStyle = `rgba(212, 168, 64, ${(1 - distance / 130) * 0.2})`;
+            context.lineWidth = 0.6;
+            context.stroke();
+          }
+        }
+      }
+
+      nodes.forEach((node) => {
+        node.pulse += node.speed;
+        node.x += node.vx;
+        node.y += node.vy;
+
+        if (node.x < 0) node.x = width;
+        if (node.x > width) node.x = 0;
+        if (node.y < 0) node.y = height;
+        if (node.y > height) node.y = 0;
+
+        const glow = (Math.sin(node.pulse) + 1) / 2;
+        const radius = node.radius * (0.8 + glow * 0.5);
+        const gradient = context.createRadialGradient(
+          node.x,
+          node.y,
+          0,
+          node.x,
+          node.y,
+          radius * 5
+        );
+
+        gradient.addColorStop(0, `hsla(${node.hue}, 80%, 68%, ${node.alpha * 0.35})`);
+        gradient.addColorStop(1, "transparent");
+
+        context.beginPath();
+        context.arc(node.x, node.y, radius * 5, 0, Math.PI * 2);
+        context.fillStyle = gradient;
+        context.fill();
+
+        context.beginPath();
+        context.arc(node.x, node.y, radius, 0, Math.PI * 2);
+        context.fillStyle = `hsla(${node.hue}, 90%, 78%, ${node.alpha})`;
+        context.fill();
+      });
+    };
+
+    const stop = () => {
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+    };
+
+    const loop = () => {
+      draw();
+      animationRef.current = requestAnimationFrame(loop);
+    };
+
+    const start = () => {
+      if (animationRef.current === null && !mediaQuery.matches && isInView) {
+        animationRef.current = requestAnimationFrame(loop);
+      }
+    };
+
+    const renderBasedOnMotionPreference = () => {
+      stop();
+      draw();
+      start();
+    };
+
+    resize();
+    renderBasedOnMotionPreference();
+
+    const handleResize = () => {
+      resize();
+      renderBasedOnMotionPreference();
+    };
+
+    const handleMotionChange = () => {
+      renderBasedOnMotionPreference();
+    };
+
+    const intersectionObserver = new IntersectionObserver(
+      ([entry]) => {
+        isInView = entry.isIntersecting;
+        if (isInView) {
+          renderBasedOnMotionPreference();
+        } else {
+          stop();
+        }
+      },
+      { threshold: 0.05 }
+    );
+    intersectionObserver.observe(canvas);
+
+    window.addEventListener("resize", handleResize, { passive: true });
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", handleMotionChange);
+    } else {
+      mediaQuery.addListener(handleMotionChange);
+    }
+
+    return () => {
+      stop();
+      intersectionObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
+      if (typeof mediaQuery.removeEventListener === "function") {
+        mediaQuery.removeEventListener("change", handleMotionChange);
+      } else {
+        mediaQuery.removeListener(handleMotionChange);
+      }
+    };
+  }, []);
+
   return (
-    <section className="relative z-10 pt-32 sm:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-5xl mx-auto text-center">
-        {/* Eyebrow */}
-        <div className="animate-hero-eyebrow">
-          <span className="text-[13px] font-medium uppercase tracking-[0.15em] text-slate-400">
-            Contract Renewal Tracking
-          </span>
+    <section
+      id="contract-renewal-hero"
+      aria-labelledby="hero-title"
+      aria-describedby="hero-subtitle"
+      className="relative z-10 flex min-h-[clamp(640px,82vh,860px)] items-center justify-center overflow-hidden bg-[#06060A] px-4 sm:px-6 lg:px-8"
+    >
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 h-full w-full"
+        aria-hidden="true"
+      />
+
+      <header className="relative z-[2] mx-auto flex w-full max-w-[700px] flex-col items-center px-4 text-center sm:px-12">
+        <div className="relative mb-8 flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(212,168,64,0.4)]">
+          <div className="h-5 w-5 rotate-45 border border-[rgba(212,168,64,0.6)]" />
+          <div className="absolute h-16 w-16 rounded-full border border-[rgba(212,168,64,0.12)]" />
         </div>
 
-        {/* Headline - Staggered Word Reveal */}
-        <h1 className="font-display font-bold text-4xl sm:text-5xl md:text-6xl lg:text-[70px] leading-[1.05] tracking-[-0.03em] mt-6 mb-8">
-          {/* Line 1: NEVER MISS A */}
-          <span className="block">
-            <span className="inline-block animate-hero-word hero-word-1 text-slate-400">NEVER</span>{" "}
-            <span className="inline-block animate-hero-word hero-word-2 text-slate-400">MISS</span>{" "}
-            <span className="inline-block animate-hero-word hero-word-3 text-slate-400">A</span>
-          </span>
-          {/* Line 2: CONTRACT RENEWAL with underline */}
-          <span className="block mt-2">
-            <span className="inline-block animate-hero-word hero-word-4 text-white">CONTRACT</span>{" "}
-            <span className="inline-block animate-hero-word hero-word-5 text-white relative">
-              RENEWAL
-              {/* Underline that draws left-to-right */}
-              <span className="absolute left-0 bottom-0 h-[3px] bg-white w-0 animate-underline-draw" />
-            </span>
-          </span>
+        <div className="mb-7 text-[10px] uppercase tracking-[0.55em] text-[rgba(212,168,64,0.55)]">
+          Renewly · Contract Renewal Tracker
+        </div>
+
+        <h1
+          id="hero-title"
+          className="mb-6 text-[clamp(46px,6vw,86px)] font-light leading-[1.1] tracking-[0.03em] text-[#F0E8D0]"
+          style={{ fontFamily: "Cormorant Garamond, Cormorant, Georgia, serif" }}
+        >
+          Never miss a
+          <br />
+          <span className="italic text-[#D4A840]">contract renewal deadline</span>
+          <br />
+          again.
         </h1>
 
-        {/* Subheadline */}
-        <p className="animate-hero-subheadline max-w-xl mx-auto text-lg sm:text-[20px] text-slate-400 font-normal leading-[1.5] mb-10">
-          Automated tracking, timely reminders, zero missed deadlines
+        <p
+          id="hero-subtitle"
+          className="max-w-[560px] text-[17px] leading-[1.8] text-[rgba(240,232,208,0.65)]"
+        >
+          Renewly helps small teams track contracts, send reminder emails before
+          due dates, and manage all renewals in one simple dashboard.
         </p>
 
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
-          {/* Primary CTA - Start Free - Now opens auth modal like "Get Started" */}
-          <Link 
-            href="/signup" 
-            className="animate-hero-cta-primary group w-full sm:w-auto h-12 px-7 text-[14px] font-medium bg-white text-black rounded-md hover:bg-slate-200 transition-all duration-200 flex items-center justify-center gap-2 focus-ring"
-          >
-            Start Free
-            <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-          </Link>
-          {/* Secondary CTA - See How It Works */}
-          <button className="animate-hero-cta-secondary w-full sm:w-auto h-12 px-7 text-[14px] font-medium text-white border border-white/20 rounded-md hover:bg-white/8 hover:border-white/40 transition-all duration-200 flex items-center justify-center focus-ring">
-            See How It Works
-          </button>
+      </header>
+    </section>
+  );
+}
+
+function HeroInfoCardsSection() {
+  return (
+    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
+      <div className="max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 gap-5 text-left md:grid-cols-2">
+          <article className="group bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-slate-700 transition-all duration-300 card-border-transition">
+            <h2 className="mb-1 text-base font-semibold text-slate-100">
+              Who this is for
+            </h2>
+            <p className="text-[13px] leading-5 text-slate-400">
+              Small teams managing vendor renewals, software contracts, and recurring agreements.
+              {" "}
+              <Link href="/signup" className="text-cyan-300 underline underline-offset-4">
+                Create your account
+              </Link>
+              {" "}
+              to start tracking contracts today.
+            </p>
+          </article>
+
+          <article className="group bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-slate-700 transition-all duration-300 card-border-transition">
+            <h2 className="mb-1 text-base font-semibold text-slate-100">
+              How it works
+            </h2>
+            <p className="text-[13px] leading-5 text-slate-400">
+              Add each contract, set reminder dates, and monitor upcoming renewals in one dashboard.
+              {" "}
+              <a href="#how-it-works" className="text-cyan-300 underline underline-offset-4">
+                See the workflow
+              </a>
+              {" "}
+              and planning steps.
+            </p>
+          </article>
         </div>
-
-        {/* Honest Microcopy */}
-        <p className="animate-hero-microcopy text-[13px] text-slate-500">
-          No credit card required • 14-day trial • Cancel anytime
-        </p>
       </div>
     </section>
   );
@@ -395,21 +644,21 @@ function StatsCard({ icon, iconColor, metric, label, delay }: StatsCardProps) {
 
   return (
     <div
-      className={`group bg-slate-900/50 border border-slate-800 rounded-2xl p-6 hover:border-slate-700 transition-all duration-300 card-border-transition ${
+      className={`group bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-slate-700 transition-all duration-300 card-border-transition ${
         isVisible ? `animate-fade-up ${delay}` : "stagger-hidden"
       }`}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <div
-          className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconColor}`}
+          className={`w-9 h-9 rounded-lg flex items-center justify-center ${iconColor}`}
         >
           {icon}
         </div>
         <div>
-          <div className="font-display text-3xl font-bold text-slate-100 mb-1 font-mono-data">
+          <div className="font-display text-lg font-semibold text-slate-100 mb-0.5 font-mono-data leading-5">
             {metric}
           </div>
-          <div className="text-sm text-slate-400">{label}</div>
+          <div className="text-[13px] leading-5 text-slate-400">{label}</div>
         </div>
       </div>
     </div>
@@ -420,32 +669,32 @@ function StatsCard({ icon, iconColor, metric, label, delay }: StatsCardProps) {
 function StatsOverview() {
   const stats = [
     {
-      icon: <CheckCircle className="w-6 h-6 text-emerald-500" />,
+      icon: <CheckCircle className="w-5 h-5 text-emerald-500" />,
       iconColor: "bg-emerald-500/20",
-      metric: "24",
-      label: "Active Contracts",
+      metric: "Track",
+      label: "Contract status in one dashboard",
       delay: "card-stagger-1",
     },
     {
-      icon: <AlertCircle className="w-6 h-6 text-amber-500" />,
+      icon: <AlertCircle className="w-5 h-5 text-amber-500" />,
       iconColor: "bg-amber-500/20",
-      metric: "3",
-      label: "Expiring Soon",
+      metric: "Alert",
+      label: "Configurable reminder schedules",
       delay: "card-stagger-2",
     },
     {
-      icon: <LayoutDashboard className="w-6 h-6 text-cyan-500" />,
+      icon: <LayoutDashboard className="w-5 h-5 text-cyan-500" />,
       iconColor: "bg-cyan-500/20",
-      metric: "$12.4k",
-      label: "Total Savings",
+      metric: "Review",
+      label: "Billing and export controls",
       delay: "card-stagger-3",
     },
   ];
 
   return (
-    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pb-20">
+    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-10 lg:pb-12">
       <div className="max-w-5xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {stats.map((stat, index) => (
             <StatsCard key={index} {...stat} />
           ))}
@@ -557,9 +806,9 @@ function DashboardPreview() {
   ];
 
   return (
-    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pb-24 hidden md:block">
+    <section className="relative z-10 px-4 sm:px-6 lg:px-8 pt-6 pb-14 sm:pb-16 lg:pb-20 hidden md:block">
       <div className="max-w-5xl mx-auto">
-        <div className="animate-hero-dashboard animate-dashboard-float">
+        <div className="animate-dashboard-float">
           <div className="bg-[#0a0a0a] border border-white/[0.08] rounded-xl overflow-hidden shadow-2xl shadow-black/50">
             {/* App Chrome */}
             <div className="h-10 bg-[#050505] border-b border-white/[0.06] flex items-center justify-between px-4">
@@ -685,22 +934,22 @@ function FeatureCard({ icon, title, description, delay }: FeatureCardProps) {
 
   return (
     <div
-      className={`group relative bg-slate-900/30 border border-slate-800 rounded-2xl p-8 hover:border-cyan-500/30 transition-all duration-300 overflow-hidden ${
+      className={`group relative bg-slate-900/30 border border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-cyan-500/30 transition-all duration-300 overflow-hidden ${
         isVisible ? `animate-fade-up ${delay}` : "stagger-hidden"
       }`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
       <div className="relative">
-        <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+        <div className="w-9 h-9 rounded-lg bg-cyan-500/20 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform duration-300">
           {icon}
         </div>
 
-        <h3 className="font-display text-xl font-bold text-slate-100 mb-3">
+        <h3 className="font-display text-base font-semibold text-slate-100 mb-2">
           {title}
         </h3>
 
-        <p className="text-slate-400 leading-relaxed">{description}</p>
+        <p className="text-[13px] leading-5 text-slate-400">{description}</p>
       </div>
     </div>
   );
@@ -710,32 +959,35 @@ function FeatureCard({ icon, title, description, delay }: FeatureCardProps) {
 function FeaturesGrid() {
   const features = [
     {
-      icon: <Bell className="w-6 h-6 text-cyan-500" />,
+      icon: <Bell className="w-5 h-5 text-cyan-500" />,
       title: "Smart Reminders",
       description:
-        "Never let a contract slip through the cracks. Get intelligent reminders via email, Slack, or SMS at customizable intervals before your renewal deadlines.",
+        "Schedule reminders at practical intervals before renewal dates and keep stakeholders informed by email.",
       delay: "card-stagger-1",
     },
     {
-      icon: <Clock className="w-6 h-6 text-cyan-500" />,
+      icon: <Clock className="w-5 h-5 text-cyan-500" />,
       title: "Visual Countdown",
       description:
-        "See your timeline at a glance. Our visual countdown dashboard shows exactly how many days remain until each contract renewal, with color-coded urgency levels.",
+        "See days left, status, and renewal urgency in one focused dashboard view.",
       delay: "card-stagger-2",
     },
     {
-      icon: <Mail className="w-6 h-6 text-cyan-500" />,
-      title: "Gmail Integration",
+      icon: <Mail className="w-5 h-5 text-cyan-500" />,
+      title: "Contract Details Hub",
       description:
-        "Seamlessly connect your inbox. Renewly scans your Gmail for contract-related emails and automatically extracts renewal dates and key terms.",
+        "Store core contract details, reminder schedules, and notes in one place for consistent follow-through.",
       delay: "card-stagger-3",
     },
   ];
 
   return (
-    <section id="features" className="relative z-10 bg-slate-950 py-24 px-4 sm:px-6 lg:px-8">
+    <section
+      id="features"
+      className="relative z-10 bg-slate-950 pt-8 sm:pt-10 lg:pt-12 pb-14 sm:pb-16 lg:pb-20 px-4 sm:px-6 lg:px-8"
+    >
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
+        <div className="text-center mb-8 sm:mb-10">
           <h2 className="font-display text-3xl sm:text-4xl font-bold text-slate-100 mb-4">
             Everything you need to stay ahead
           </h2>
@@ -744,7 +996,7 @@ function FeaturesGrid() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} />
           ))}
@@ -896,26 +1148,26 @@ function BenefitsGridSection() {
     {
       number: "02",
       icon: <Zap className="w-8 h-8" />,
-      title: "Zero Setup Friction",
-      description: "Import from CSV or connect Google Calendar in 60 seconds. No IT required.",
+      title: "Fast Setup",
+      description: "Add contracts with a guided form and start tracking renewals immediately.",
     },
     {
       number: "03",
       icon: <Users className="w-8 h-8" />,
-      title: "Team Alignment",
-      description: "Shared dashboard means no more 'I thought you handled it' moments.",
+      title: "Clear Visibility",
+      description: "Track statuses and renewal dates in one place instead of scattered spreadsheets.",
     },
     {
       number: "04",
       icon: <FileCheck className="w-8 h-8" />,
-      title: "Audit Ready",
-      description: "Complete history of every contract decision. Compliance made simple.",
+      title: "Exportable Data",
+      description: "Export contract data to CSV when premium export access is enabled.",
     },
     {
       number: "05",
       icon: <GitBranch className="w-8 h-8" />,
-      title: "Smart Workflows",
-      description: "Auto-assign renewals to owners based on contract type or value.",
+      title: "Flexible Reminder Rules",
+      description: "Choose reminder offsets (for example 60, 30, 14, 7, 3, and 1 day) per contract.",
     },
     {
       number: "06",
@@ -1037,15 +1289,15 @@ function AutomatedRemindersBlock() {
               Set it once. Never worry again.
             </h2>
             <p className="font-body text-lg text-slate-400 leading-relaxed mb-8">
-              Customize reminder schedules per contract. Escalate to Slack or SMS for critical renewals. Include negotiation playbooks in reminder emails.
+              Configure reminder schedules per contract and send renewal notifications by email before deadlines.
             </p>
 
             {/* Checklist */}
             <div className="space-y-4">
               {[
-                "Multi-channel delivery (Email, Slack, SMS)",
-                "Customizable templates with variables",
-                "Escalation chains for unassigned contracts",
+                "Email reminders with configurable schedules",
+                "Additional notification recipients supported",
+                "Premium-gated reminder delivery controls",
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1078,7 +1330,7 @@ function VisualTimelineBlock() {
               See the future of your contracts
             </h2>
             <p className="font-body text-lg text-slate-400 leading-relaxed">
-              Gantt-style timeline view shows all renewals across months. Spot busy periods. Plan negotiations in advance.
+              Monitor contract status and days-left indicators so renewal deadlines are visible before they become urgent.
             </p>
           </div>
 
@@ -1129,11 +1381,11 @@ function IntegrationEcosystemBlock() {
   const { ref, isVisible } = useScrollReveal();
 
   const integrations = [
-    { icon: <Mail className="w-5 h-5" />, label: "Gmail", angle: -72 },
-    { icon: <Calendar className="w-5 h-5" />, label: "Calendar", angle: -36 },
-    { icon: <MessageSquare className="w-5 h-5" />, label: "Slack", angle: 0 },
-    { icon: <Zap className="w-5 h-5" />, label: "Zapier", angle: 36 },
-    { icon: <DollarSign className="w-5 h-5" />, label: "QuickBooks", angle: 72 },
+    { icon: <FileCheck className="w-5 h-5" />, label: "Contracts", angle: -72 },
+    { icon: <Bell className="w-5 h-5" />, label: "Reminders", angle: -36 },
+    { icon: <LayoutDashboard className="w-5 h-5" />, label: "Dashboard", angle: 0 },
+    { icon: <CreditCard className="w-5 h-5" />, label: "Billing", angle: 36 },
+    { icon: <Table className="w-5 h-5" />, label: "CSV Export", angle: 72 },
   ];
 
   return (
@@ -1195,13 +1447,13 @@ function IntegrationEcosystemBlock() {
           {/* Text - Right */}
           <div className={`lg:pl-8 ${isVisible ? "slide-reveal-right visible" : "slide-reveal-right"}`} style={{ transitionDelay: "200ms" }}>
             <p className="text-xs font-medium uppercase tracking-widest text-emerald-400 mb-4">
-              CONNECTIVITY
+              WORKFLOW
             </p>
             <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-6">
-              Plays nice with your stack
+              Keep renewal work in one system
             </h2>
             <p className="font-body text-lg text-slate-400 leading-relaxed">
-              Two-way sync with Google Calendar. Auto-create renewal events. Push financial data to accounting software.
+              Capture contract details, configure reminders, monitor status, and manage billing from a single product surface.
             </p>
           </div>
         </div>
@@ -1214,14 +1466,13 @@ function IntegrationEcosystemBlock() {
 // Phase 2: Section 4 - Social Proof Testimonials
 // ============================================
 interface TestimonialCardProps {
-  quote: string;
-  author: string;
   title: string;
-  avatarGradient: string;
+  description: string;
+  tag: string;
   featured?: boolean;
 }
 
-function TestimonialCard({ quote, author, title, avatarGradient, featured }: TestimonialCardProps) {
+function TestimonialCard({ title, description, tag, featured }: TestimonialCardProps) {
   const { ref, isVisible } = useScrollReveal();
 
   return (
@@ -1231,7 +1482,7 @@ function TestimonialCard({ quote, author, title, avatarGradient, featured }: Tes
         featured ? "p-8" : "p-7"
       } card-hover-lift ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}
     >
-      {/* Quote Icon */}
+      {/* Insight Icon */}
       <Quote className="absolute top-4 left-4 w-10 h-10 text-slate-800" />
 
       {/* Featured Stars */}
@@ -1243,18 +1494,19 @@ function TestimonialCard({ quote, author, title, avatarGradient, featured }: Tes
         </div>
       )}
 
-      {/* Quote Text */}
+      {/* Title */}
       <p className={`font-body text-slate-200 leading-relaxed relative z-10 ${featured ? "text-base" : "text-[15px]"}`}>
-        "{quote}"
+        {title}
       </p>
 
-      {/* Author */}
+      {/* Description */}
+      <p className="text-sm text-slate-400 mt-3 relative z-10">
+        {description}
+      </p>
+
+      {/* Tag */}
       <div className="flex items-center gap-3 mt-5 relative z-10">
-        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${avatarGradient}`} />
-        <div>
-          <div className="text-sm font-semibold text-white">{author}</div>
-          <div className="text-xs text-slate-500">{title}</div>
-        </div>
+        <span className="text-xs font-medium uppercase tracking-wider text-cyan-400">{tag}</span>
       </div>
     </div>
   );
@@ -1263,55 +1515,22 @@ function TestimonialCard({ quote, author, title, avatarGradient, featured }: Tes
 function SocialProofSection() {
   const { ref, isVisible } = useScrollReveal();
 
-  const testimonials = [
-    {
-      quote: "Saved us $40K in the first quarter by catching auto-renewals we didn't even know about. This paid for itself in week one.",
-      author: "Sarah Chen",
-      title: "Operations Lead, TechStart",
-      avatarGradient: "from-rose-500 to-pink-500",
-    },
-    {
-      quote: "Finally replaced our spreadsheet nightmare. The timeline view alone is worth the price - we can see exactly what's coming up and plan our budget accordingly. Game changer for our finance team.",
-      author: "Marcus Johnson",
-      title: "CFO, GrowthCo",
-      avatarGradient: "from-cyan-500 to-blue-500",
-      featured: true,
-    },
-    {
-      quote: "Audit season used to take weeks. Now I export everything in one click. Our auditors were impressed.",
-      author: "Elena Rodriguez",
-      title: "Legal Ops, ScaleUp Inc",
-      avatarGradient: "from-emerald-500 to-teal-500",
-    },
-  ];
-
-  const trustLogos = ["Notion", "Linear", "Vercel", "Stripe", "Figma"];
-
   return (
     <section id="testimonials" ref={ref} className="relative z-10 py-24 sm:py-32 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0f172a, #020617)" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
           <h2 className="font-display text-4xl font-bold text-white mb-4">
-            Loved by operations teams
+            Built for real renewal workflows
           </h2>
-        </div>
-
-        {/* Trust Bar */}
-        <div className={`flex flex-wrap items-center justify-center gap-8 sm:gap-12 mb-16 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`} style={{ transitionDelay: "100ms" }}>
-          {trustLogos.map((logo, index) => (
-            <span
-              key={index}
-              className="trust-logo text-lg font-semibold text-slate-500 cursor-pointer"
-            >
-              {logo}
-            </span>
-          ))}
+          <p className="text-slate-400 text-lg">
+            Clear tracking, configurable reminders, and straightforward billing controls.
+          </p>
         </div>
 
         {/* Testimonials Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {testimonials.map((testimonial, index) => (
+          {SOCIAL_PROOF_TESTIMONIALS.map((testimonial, index) => (
             <TestimonialCard key={index} {...testimonial} />
           ))}
         </div>
@@ -1328,8 +1547,8 @@ function SocialProofSection() {
 const CONNECTED_STEPS = [
   { 
     id: 1, 
-    title: "Import", 
-    description: "Upload CSV or connect calendar",
+    title: "Add", 
+    description: "Create a contract record",
     icon: Upload,
     bgColor: "bg-indigo-500/10",
     bgColorActive: "bg-indigo-500/20",
@@ -1337,8 +1556,8 @@ const CONNECTED_STEPS = [
   },
   { 
     id: 2, 
-    title: "Review", 
-    description: "AI detects dates & categorizes",
+    title: "Schedule", 
+    description: "Choose reminder intervals",
     icon: Sparkles,
     bgColor: "bg-violet-500/10",
     bgColorActive: "bg-violet-500/20",
@@ -1346,8 +1565,8 @@ const CONNECTED_STEPS = [
   },
   { 
     id: 3, 
-    title: "Set Rules", 
-    description: "Configure reminder schedules",
+    title: "Track", 
+    description: "Monitor status and days left",
     icon: Bell,
     bgColor: "bg-amber-500/10",
     bgColorActive: "bg-amber-500/20",
@@ -1355,8 +1574,8 @@ const CONNECTED_STEPS = [
   },
   { 
     id: 4, 
-    title: "Relax", 
-    description: "Automated monitoring begins",
+    title: "Act", 
+    description: "Update, renew, or export",
     icon: CheckCircle,
     bgColor: "bg-emerald-500/10",
     bgColorActive: "bg-emerald-500/20",
@@ -1828,12 +2047,12 @@ function ComparisonSection() {
   const { ref, isVisible } = useScrollReveal();
 
   const features = [
-    { label: "Setup Time", spreadsheet: { icon: "x", text: "Hours" }, crm: { icon: "minus", text: "Weeks" }, renewly: { icon: "check", text: "Minutes" } },
-    { label: "Renewal Focus", spreadsheet: { icon: "x", text: "Generic" }, crm: { icon: "minus", text: "Buried" }, renewly: { icon: "check", text: "Core feature" } },
-    { label: "Reminder Automation", spreadsheet: { icon: "x", text: "None" }, crm: { icon: "minus", text: "Complex" }, renewly: { icon: "check", text: "Smart defaults" } },
-    { label: "Contract Timeline", spreadsheet: { icon: "x", text: "None" }, crm: { icon: "minus", text: "Manual" }, renewly: { icon: "check", text: "Visual native" } },
-    { label: "Price", spreadsheet: { icon: "check", text: "Free" }, crm: { icon: "x", text: "$$$" }, renewly: { icon: "check", text: "$" } },
-    { label: "Learning Curve", spreadsheet: { icon: "x", text: "Steep" }, crm: { icon: "x", text: "Very steep" }, renewly: { icon: "check", text: "None" } },
+    { label: "Renewal date visibility", spreadsheet: { icon: "minus", text: "Varies" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
+    { label: "Contract status tracking", spreadsheet: { icon: "minus", text: "Manual" }, crm: { icon: "minus", text: "Generic" }, renewly: { icon: "check", text: "Focused" } },
+    { label: "Reminder scheduling", spreadsheet: { icon: "x", text: "Limited" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Included" } },
+    { label: "Email reminders", spreadsheet: { icon: "x", text: "External setup" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Premium" } },
+    { label: "CSV export", spreadsheet: { icon: "check", text: "Native" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Premium" } },
+    { label: "Billing controls", spreadsheet: { icon: "x", text: "N/A" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
   ];
 
   const getIcon = (icon: string) => {
@@ -1868,10 +2087,10 @@ function ComparisonSection() {
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
           <h2 className="font-display text-4xl font-bold text-white mb-4">
-            Why Renewly vs. the alternatives?
+            Where Renewly is focused
           </h2>
           <p className="text-lg text-slate-400">
-            See how we stack up
+            A feature-level view of renewal tracking coverage
           </p>
         </div>
 
@@ -1975,33 +2194,6 @@ function FAQSection() {
   const { ref, isVisible } = useScrollReveal();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
-  const faqs = [
-    {
-      question: "Can I import from Excel?",
-      answer: "Yes! Upload any CSV or Excel file and our AI will automatically detect renewal dates, contract names, and key terms. Most imports take less than 30 seconds.",
-    },
-    {
-      question: "What if I have 500+ contracts?",
-      answer: "Our Scale plan handles unlimited contracts with no performance impact. Enterprise customers manage portfolios of 10,000+ contracts with ease.",
-    },
-    {
-      question: "Do you store my contract files?",
-      answer: "No, we only store metadata (dates, names, values). Your actual contract files stay where they are. We integrate with your existing storage.",
-    },
-    {
-      question: "Can I customize reminder timing?",
-      answer: "Absolutely. Set custom schedules per contract or use our smart defaults (30, 14, 7, 3 days). Add escalation chains for critical renewals.",
-    },
-    {
-      question: "Is there a free trial?",
-      answer: "Yes, 14 days with full features. No credit card required. Import your contracts and see value immediately.",
-    },
-    {
-      question: "What integrations do you support?",
-      answer: "Gmail, Google Calendar, Slack, Microsoft Teams, Zapier, and QuickBooks. More integrations added monthly based on user requests.",
-    },
-  ];
-
   const handleToggle = useCallback((index: number) => {
     setOpenIndex((prev) => (prev === index ? null : index));
   }, []);
@@ -2024,7 +2216,7 @@ function FAQSection() {
 
         {/* FAQ Items */}
         <div className={`${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`} style={{ transitionDelay: "200ms" }}>
-          {faqs.map((faq, index) => (
+          {FAQ_ITEMS.map((faq, index) => (
             <FAQItem
               key={index}
               question={faq.question}
@@ -2046,37 +2238,37 @@ function FAQSection() {
 const IMPACT_CARDS = [
   {
     icon: TrendingUp,
-    label: "ROI",
-    metric: "10x",
-    context: "Average return first year",
-    miniProof: "Based on 2,000+ teams",
+    label: "VISIBILITY",
+    metric: "Clear",
+    context: "Renewal dates and statuses in one dashboard",
+    miniProof: "Focused contract tracking",
     cornerColor: "bg-cyan-500",
     iconColor: "text-cyan-400",
   },
   {
     icon: Clock,
-    label: "TIME",
-    metric: "5hrs",
-    context: "Saved monthly vs spreadsheets",
-    miniProof: "Replaced 12 tabs, 3 docs",
+    label: "PACE",
+    metric: "Fast",
+    context: "Create and update contracts without spreadsheet overhead",
+    miniProof: "Form-based contract workflow",
     cornerColor: "bg-emerald-500",
     iconColor: "text-emerald-400",
   },
   {
     icon: Shield,
-    label: "RISK",
-    metric: "Zero",
-    context: "Missed renewals with alerts",
-    miniProof: "Since using Renewly",
+    label: "CONTROL",
+    metric: "Proactive",
+    context: "Configurable reminders before important renewal deadlines",
+    miniProof: "Email reminder scheduling",
     cornerColor: "bg-amber-500",
     iconColor: "text-amber-400",
   },
   {
     icon: Zap,
-    label: "SPEED",
-    metric: "60sec",
-    context: "Setup time, not days",
-    miniProof: "Import → first alert",
+    label: "BILLING",
+    metric: "Simple",
+    context: "Free, monthly, and yearly plans with clear feature gates",
+    miniProof: "Billing portal and entitlements",
     cornerColor: "bg-violet-500",
     iconColor: "text-violet-400",
   },
@@ -2145,7 +2337,7 @@ function WhyRenewlySection() {
 }
 
 // ============================================
-// Phase 3: Section - The Reddit Truth
+// Phase 3: Section - Common Renewal Pains
 // ============================================
 
 const REDDIT_CARDS = [
@@ -2155,16 +2347,20 @@ const REDDIT_CARDS = [
     accentBorderColor: "hover:border-rose-500",
     quoteIconBg: "bg-rose-500/20",
     quoteIconColor: "text-rose-400",
-    numberBadge: "£5k",
+    numberBadge: "30/60 days",
     numberColor: "text-rose-400",
-    quote: "We missed the 60 day notice period and we got stuck for a year at just over £5k. My boss was PISSED. Felt like a real rookie mistake.",
-    source: "r/smallbusiness",
+    quote:
+      "A cancellation request was rejected and the contract was auto-renewed for another 12 months due to notice-window dispute.",
+    source: "r/legaladvice · Automatic renewal / contract dispute (Feb 2025)",
+    sourceUrl:
+      "https://www.reddit.com/r/legaladvice/comments/1iyaw0j/automatic_renewal_contract_dispute/",
     solutionBadge: "NOTICE PERIOD GUARD",
     solutionBadgeBg: "bg-cyan-500/10",
     solutionBadgeText: "text-cyan-400",
-    solutionTitle: "We track cancellation windows",
-    solutionDesc: "Not just renewals—every deadline matters",
-    ctaText: "See how →",
+    solutionTitle: "Our MVP tracks contract renewal and cancellation deadlines",
+    solutionDesc:
+      "Use one contract renewal tracker to monitor end dates and notice periods before they roll over.",
+    ctaText: "Track notice windows →",
     ctaColor: "text-cyan-400",
   },
   {
@@ -2173,16 +2369,21 @@ const REDDIT_CARDS = [
     accentBorderColor: "hover:border-amber-500",
     quoteIconBg: "bg-amber-500/20",
     quoteIconColor: "text-amber-400",
-    numberBadge: "Lost",
+    numberBadge: "89 days",
     numberColor: "text-amber-400",
-    quote: "Spreadsheets, a nightmare and I never followed up. New subscriptions fell through the cracks and weren't recorded properly.",
-    source: "r/ADHD",
+    quote:
+      "Even after notice was reportedly sent, teams still struggled with auto-renewal disputes and renewal deadlines.",
+    source:
+      "r/salesforce · 89 days notice but auto-renewal dispute (Jan 2026)",
+    sourceUrl:
+      "https://www.reddit.com/r/salesforce/comments/1ql248u/despite_89_days_notice_salesforce_is_refusing_to/",
     solutionBadge: "AUTO-PILOT TRACKING",
     solutionBadgeBg: "bg-emerald-500/10",
     solutionBadgeText: "text-emerald-400",
-    solutionTitle: "Import once, monitor forever",
-    solutionDesc: "No more cracked systems",
-    ctaText: "End chaos →",
+    solutionTitle: "Our MVP gives one renewal timeline for each contract",
+    solutionDesc:
+      "Centralized renewal deadline tracking helps teams act earlier and avoid last-minute vendor lock-ins.",
+    ctaText: "See renewal timeline →",
     ctaColor: "text-emerald-400",
   },
   {
@@ -2191,16 +2392,20 @@ const REDDIT_CARDS = [
     accentBorderColor: "hover:border-violet-500",
     quoteIconBg: "bg-violet-500/20",
     quoteIconColor: "text-violet-400",
-    numberBadge: "$$$",
+    numberBadge: "Manual",
     numberColor: "text-violet-400",
-    quote: "We spend millions on SaaS but track renewal dates in...",
-    source: "r/Startups",
+    quote:
+      "Admins described using Outlook, spreadsheets, and scripts because renewal tracking stayed manual and fragmented.",
+    source: "r/sysadmin · Methods for tracking license renewals (Feb 2024)",
+    sourceUrl:
+      "https://www.reddit.com/r/sysadmin/comments/1agr6jm/methods_for_tracking_license_renewals/",
     solutionBadge: "PROFESSIONAL GRADE",
     solutionBadgeBg: "bg-indigo-500/10",
     solutionBadgeText: "text-indigo-400",
-    solutionTitle: "Built for teams with real budgets",
-    solutionDesc: "Enterprise-grade, startup-simple",
-    ctaText: "Upgrade →",
+    solutionTitle: "Our MVP replaces spreadsheets with one contract dashboard",
+    solutionDesc:
+      "Store renewal terms, due dates, and reminders in one place instead of scattered tools.",
+    ctaText: "Replace spreadsheets →",
     ctaColor: "text-indigo-400",
   },
   {
@@ -2209,16 +2414,20 @@ const REDDIT_CARDS = [
     accentBorderColor: "hover:border-cyan-500",
     quoteIconBg: "bg-cyan-500/20",
     quoteIconColor: "text-cyan-400",
-    numberBadge: "30/14/7",
+    numberBadge: "At scale",
     numberColor: "text-cyan-400",
-    quote: "Customers complaining about 'surprise' renewal charges even though they agreed to auto-renewal when they signed up.",
-    source: "r/SaaS",
+    quote:
+      "IT managers called spreadsheets the worst option at scale for renewal tracking and reminder follow-up.",
+    source: "r/ITManagers · Renewal tracking software thread (Mar 2026)",
+    sourceUrl:
+      "https://www.reddit.com/r/ITManagers/comments/1mzzhw4/renewal_tracking_software/",
     solutionBadge: "TRIPLE WARNING SYSTEM",
     solutionBadgeBg: "bg-cyan-500/10",
     solutionBadgeText: "text-cyan-400",
-    solutionTitle: "30, 14, 7 days. Never surprised.",
-    solutionDesc: "Proactive alerts, reactive-free",
-    ctaText: "Get alerts →",
+    solutionTitle: "Our MVP sends proactive contract reminder alerts",
+    solutionDesc:
+      "Set reminder offsets (for example 60/30/14/7 days) so teams have time to review and negotiate.",
+    ctaText: "Set reminder alerts →",
     ctaColor: "text-cyan-400",
   },
 ] as const;
@@ -2239,7 +2448,7 @@ function RedditTruthSection() {
             className={`inline-block mb-4 ${isVisible ? "animate-typewriter" : "opacity-0"}`}
           >
             <span className="text-[11px] font-medium uppercase tracking-[0.25em] text-rose-500">
-              FROM REDDIT, UNFILTERED
+              REDDIT-VERIFIED RENEWAL PAINS
             </span>
           </div>
 
@@ -2250,7 +2459,7 @@ function RedditTruthSection() {
             }`}
             style={{ animationDelay: "800ms" }}
           >
-            The pains we actually solve
+            Real contract renewal pain points from Reddit
           </h2>
 
           {/* Subheadline */}
@@ -2260,7 +2469,8 @@ function RedditTruthSection() {
             }`}
             style={{ animationDelay: "1000ms" }}
           >
-            Real quotes. Real losses. Real solutions.
+            These discussions show why teams need contract renewal tracking,
+            reminder alerts, and a single renewal dashboard.
           </p>
         </div>
 
@@ -2322,7 +2532,15 @@ function RedditTruthSection() {
                   }`}
                   style={{ animationDelay: `${900 + index * 150}ms` }}
                 >
-                  — {card.source}
+                  —{" "}
+                  <a
+                    href={card.sourceUrl}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="underline underline-offset-2 hover:text-slate-300"
+                  >
+                    {card.source}
+                  </a>
                 </p>
 
                 {/* Divider */}
@@ -2363,11 +2581,12 @@ function RedditTruthSection() {
                 </p>
 
                 {/* Mini CTA */}
-                <button
-                  className={`mt-3 text-xs font-medium ${card.ctaColor} hover:underline transition-all hover:translate-x-1 flex items-center gap-1`}
+                <Link
+                  href="/signup"
+                  className={`mt-3 inline-flex text-xs font-medium ${card.ctaColor} hover:underline transition-all hover:translate-x-1 items-center gap-1`}
                 >
                   {card.ctaText}
-                </button>
+                </Link>
               </div>
             </div>
           ))}
@@ -2381,14 +2600,14 @@ function RedditTruthSection() {
           style={{ animationDelay: "1500ms" }}
         >
           <p className="text-sm text-slate-400 mb-4">
-            These are real Reddit posts. We built Renewly to fix them.
+            Renewly is built to reduce renewal surprises and manual follow-up work.
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <button className="px-5 py-3 bg-slate-800 text-slate-200 text-sm font-medium rounded-lg hover:bg-slate-700 transition-all hover:-translate-y-0.5">
               Read more stories →
             </button>
             <button className="px-6 py-3 bg-cyan-600 text-slate-950 text-sm font-medium rounded-lg hover:bg-cyan-500 transition-all hover:-translate-y-0.5">
-              Start free trial
+              Start free
             </button>
           </div>
         </div>
@@ -2407,11 +2626,11 @@ const ROLES = [
     tab: "CFOs",
     role: "Finance Leaders",
     painHeadline: "Budgets blown by surprise renewals",
-    painDesc: "Founders find $40K charges 6 months later. No visibility.",
+    painDesc: "Surprise charges show up late because renewals are not tracked consistently.",
     solutionTag: "SPEND CONTROL",
     solutionColor: "bg-emerald-500/20 text-emerald-400",
     benefit: "Never miss a renewal deadline again",
-    bullets: ["Real-time budget tracking", "Multi-channel alerts", "Spend visibility"],
+    bullets: ["Contract value fields", "Days-left status", "Renewal-date visibility"],
   },
   {
     id: "ops",
@@ -2428,12 +2647,12 @@ const ROLES = [
     id: "legal",
     tab: "Legal",
     role: "Legal Teams",
-    painHeadline: "Audit trails that don't exist",
-    painDesc: "Compliance asks for history. You have emails and hope.",
+    painHeadline: "Contract details are hard to retrieve",
+    painDesc: "Key dates and renewal terms are scattered across inboxes and notes.",
     solutionTag: "AUDIT READY",
     solutionColor: "bg-indigo-500/20 text-indigo-400",
-    benefit: "Every decision logged. Instant export.",
-    bullets: ["Full decision history", "One-click audit export", "Timestamped records"],
+    benefit: "Structured contract records with export support",
+    bullets: ["Consistent contract fields", "CSV export on premium", "Shared dashboard visibility"],
   },
   {
     id: "founders",
@@ -2452,10 +2671,10 @@ const ROLES = [
     role: "Buyers",
     painHeadline: "Vendors renew without approval",
     painDesc: "Auto-renewals slip through. Budgets miss by thousands.",
-    solutionTag: "APPROVAL LOCK",
+    solutionTag: "RENEWAL CONTROL",
     solutionColor: "bg-rose-500/20 text-rose-400",
     benefit: "No more surprise auto-renewals",
-    bullets: ["Pre-approval workflows", "Vendor tracking", "Budget protection"],
+    bullets: ["Renewal reminders", "Vendor details", "Date visibility"],
   },
 ] as const;
 
@@ -2563,8 +2782,8 @@ const PAIN_OPTIONS = [
     icon: CalendarX,
     solutionIcon: CalendarCheck,
     headline: "Never miss a deadline",
-    subtext: "Smart alerts at 30, 14, 7 days. Plus buffer for negotiation.",
-    bullets: ["Calendar sync", "Email + Slack", "SMS backup"],
+    subtext: "Set reminder offsets and receive email alerts before renewal deadlines.",
+    bullets: ["Configurable day offsets", "Email reminders", "Days-left dashboard"],
     iconBg: "bg-cyan-500/10",
     iconColor: "text-cyan-400",
   },
@@ -2574,8 +2793,8 @@ const PAIN_OPTIONS = [
     icon: CreditCard,
     solutionIcon: ShieldCheck,
     headline: "Control every dollar",
-    subtext: "Cancel before charge. Full visibility into upcoming spend.",
-    bullets: ["Pre-deadline alerts", "One-click cancel", "Spend tracking"],
+    subtext: "Get visibility before renewal dates so you can make decisions before charges hit.",
+    bullets: ["Pre-deadline alerts", "Value tracking fields", "Status visibility"],
     iconBg: "bg-emerald-500/10",
     iconColor: "text-emerald-400",
   },
@@ -2586,7 +2805,7 @@ const PAIN_OPTIONS = [
     solutionIcon: LayoutDashboard,
     headline: "Ditch the chaos",
     subtext: "One source of truth. No version conflicts. No deleted rows.",
-    bullets: ["Import in 60s", "Auto-categorize", "Team permissions"],
+    bullets: ["Guided contract form", "Search and filters", "Contract detail view"],
     iconBg: "bg-violet-500/10",
     iconColor: "text-violet-400",
   },
@@ -2597,7 +2816,7 @@ const PAIN_OPTIONS = [
     solutionIcon: BellRing,
     headline: "Align everyone",
     subtext: "Shared dashboard. Assigned owners. No 'I thought you...'",
-    bullets: ["Role assignments", "Slack alerts", "Status dashboard"],
+    bullets: ["Shared dashboard", "Email notifications", "Status dashboard"],
     iconBg: "bg-amber-500/10",
     iconColor: "text-amber-400",
   },
@@ -2757,8 +2976,8 @@ const INDUSTRIES = [
   {
     icon: Scale,
     role: "Legal",
-    pain: "Audit gaps, no history trail",
-    solution: "PROOF READY",
+    pain: "Contract terms and dates hard to retrieve",
+    solution: "DETAILS CENTRALIZED",
     solutionBg: "bg-cyan-500/20",
     solutionText: "text-cyan-400",
     borderColor: "hover:border-cyan-500",
@@ -2849,20 +3068,20 @@ function IndustryFitSection() {
 
 const PRICING_PLANS_NEW = [
   {
-    id: "starter",
-    name: "STARTER",
+    id: "free",
+    name: "FREE",
     nameColor: "text-slate-500",
     monthlyPrice: 0,
     annualPrice: 0,
     priceSize: "text-[40px]",
-    tagline: "For individuals testing the water",
+    tagline: "For getting started",
     features: [
-      { text: "10 active contracts", checkColor: "text-emerald-400" },
-      { text: "Email reminders", checkColor: "text-emerald-400" },
-      { text: "CSV import", checkColor: "text-emerald-400" },
-      { text: "Basic dashboard", checkColor: "text-emerald-400" },
+      { text: "Up to 5 contracts", checkColor: "text-emerald-400" },
+      { text: "Contract dashboard", checkColor: "text-emerald-400" },
+      { text: "Search and filtering", checkColor: "text-emerald-400" },
+      { text: "Contract detail views", checkColor: "text-emerald-400" },
     ],
-    limitation: "No team sharing",
+    limitation: "Email reminders and CSV export",
     ctaText: "Start Free",
     ctaStyle: "bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-100",
     ctaHeight: "h-11",
@@ -2872,59 +3091,59 @@ const PRICING_PLANS_NEW = [
     valueProp: null,
   },
   {
-    id: "pro",
-    name: "PRO",
+    id: "monthly",
+    name: "MONTHLY",
     nameColor: "text-cyan-400",
-    monthlyPrice: 12,
-    annualPrice: 9.6,
+    monthlyPrice: 19,
+    annualPrice: 19,
     priceSize: "text-[48px]",
-    tagline: "For professionals who need control",
+    tagline: "Premium access billed monthly",
     features: [
       { text: "Unlimited contracts", checkColor: "text-cyan-400" },
-      { text: "3 team members", checkColor: "text-cyan-400" },
-      { text: "Slack alerts", checkColor: "text-cyan-400" },
-      { text: "Google Calendar sync", checkColor: "text-cyan-400" },
-      { text: "API access", checkColor: "text-cyan-400" },
+      { text: "Email reminders", checkColor: "text-cyan-400" },
+      { text: "CSV export", checkColor: "text-cyan-400" },
+      { text: "Billing portal access", checkColor: "text-cyan-400" },
+      { text: "Live pricing in dashboard", checkColor: "text-cyan-400" },
     ],
     limitation: null,
-    ctaText: "Start 14-Day Trial",
+    ctaText: "Choose Monthly",
     ctaStyle: "bg-cyan-600 text-slate-950 hover:bg-cyan-500",
     ctaHeight: "h-12",
     bg: "bg-slate-800",
     border: "border-t-2 border-cyan-500",
-    popular: true,
-    valueProp: { text: "Saves 5hrs/month avg", bg: "bg-cyan-500/10", text_color: "text-cyan-400" },
+    popular: false,
+    valueProp: null,
   },
   {
-    id: "power",
-    name: "POWER",
+    id: "yearly",
+    name: "YEARLY",
     nameColor: "text-violet-400",
     monthlyPrice: 19,
-    annualPrice: 15.2,
+    annualPrice: 15.83,
     priceSize: "text-[40px]",
-    tagline: "For power users who want more",
+    tagline: "Premium access billed annually ($190/year)",
     features: [
-      { text: "Everything in Pro", checkColor: "text-violet-400" },
-      { text: "Advanced analytics", checkColor: "text-violet-400" },
-      { text: "Zapier integrations", checkColor: "text-violet-400" },
-      { text: "Export to PDF/Excel", checkColor: "text-violet-400" },
-      { text: "Priority email support", checkColor: "text-violet-400" },
+      { text: "Unlimited contracts", checkColor: "text-violet-400" },
+      { text: "Email reminders", checkColor: "text-violet-400" },
+      { text: "CSV export", checkColor: "text-violet-400" },
+      { text: "Billing portal access", checkColor: "text-violet-400" },
+      { text: "Equivalent to $15.83/month", checkColor: "text-violet-400" },
     ],
     limitation: null,
-    ctaText: "Start 14-Day Trial",
+    ctaText: "Choose Yearly",
     ctaStyle: "bg-slate-800 border border-slate-700 text-slate-200 hover:border-violet-400 hover:text-violet-400",
     ctaHeight: "h-11",
     bg: "bg-slate-900",
     border: "border-slate-800",
-    popular: false,
-    valueProp: { text: "For serious solo users", bg: "bg-violet-500/10", text_color: "text-violet-400" },
+    popular: true,
+    valueProp: { text: "Save 17% vs monthly billing", bg: "bg-violet-500/10", text_color: "text-violet-400" },
   },
 ] as const;
 
 const PRICING_FAQS = [
-  { q: "Can I change plans?", a: "Anytime. Prorated." },
-  { q: "What happens after trial?", a: "Choose plan or downgrade to Free." },
-  { q: "Do you store contracts?", a: "No. Metadata only. You keep files." },
+  { q: "Can I change plans?", a: "Yes. You can switch in billing settings." },
+  { q: "What unlocks on paid plans?", a: "Email reminders and CSV export." },
+  { q: "Is there a free option?", a: "Yes. Free plan includes up to 5 contracts." },
 ] as const;
 
 function PricingSection() {
@@ -2989,7 +3208,7 @@ function PricingSection() {
             </span>
             {isAnnual && (
               <span className="text-[10px] font-bold bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded animate-save-badge">
-                Save 20%
+                Save 17%
               </span>
             )}
           </div>
@@ -3216,7 +3435,7 @@ function FinalCTASection() {
           }`}
           style={{ animationDelay: "250ms" }}
         >
-          Join 2,000+ teams tracking contracts without stress.
+          Start with the free plan and upgrade to unlock premium reminder and export features.
         </p>
 
         {/* Form */}
@@ -3260,7 +3479,7 @@ function FinalCTASection() {
         >
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            Free 14-day trial
+            Free plan available
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -3365,7 +3584,7 @@ function FloatingActionButton() {
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:hidden z-50 animate-fab-slide">
       <Link href="/signup" className="w-full h-12 bg-cyan-600 text-slate-950 font-medium rounded-xl flex items-center justify-center gap-2 shadow-[0_-4px_20px_rgba(8,145,178,0.3)] animate-fab-pulse">
-        Start Free Trial
+        Start Free
         <ArrowRight className="w-4 h-4" />
       </Link>
     </div>
@@ -3380,6 +3599,13 @@ function FloatingActionButton() {
 export default function Home() {
   return (
     <main className="relative min-h-screen bg-slate-950">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(HOMEPAGE_STRUCTURED_DATA),
+        }}
+      />
+
       {/* Dotted Background */}
       <DottedBackground />
 
@@ -3388,6 +3614,9 @@ export default function Home() {
 
       {/* Hero Section */}
       <HeroSection />
+
+      {/* Hero Info Cards */}
+      <HeroInfoCardsSection />
 
       {/* Stats Overview */}
       <StatsOverview />

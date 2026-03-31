@@ -2,12 +2,6 @@
 // Add Contract Form Constants
 // ============================================
 
-export const STEPS = [
-  { id: "basic", label: "Basic Info" },
-  { id: "vendor", label: "Vendor & Terms" },
-  { id: "reminders", label: "Reminders" },
-];
-
 export const CONTRACT_TYPES = [
   { value: "license", label: "Software License" },
   { value: "subscription", label: "Subscription" },

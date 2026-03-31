@@ -1,5 +1,16 @@
 import { z } from 'zod'
 
+const supportedTimezones = new Set(
+  typeof Intl.supportedValuesOf === 'function'
+    ? Intl.supportedValuesOf('timeZone')
+    : ['UTC']
+)
+
+const timezoneSchema = z.string().refine(
+  (value) => supportedTimezones.has(value),
+  'Invalid timezone'
+)
+
 /**
  * Signup form validation schema
  * Enforces strong password requirements and valid email format
@@ -56,7 +67,7 @@ export const resetPasswordSchema = z.object({
 export const profileUpdateSchema = z.object({
   full_name: z.string().min(2, 'Full name must be at least 2 characters').optional(),
   avatar_url: z.string().url('Invalid avatar URL').optional(),
-  timezone: z.string().optional(),
+  timezone: timezoneSchema.optional(),
   email_notifications: z.boolean().optional()
 })
 

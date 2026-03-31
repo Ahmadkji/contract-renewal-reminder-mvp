@@ -1,34 +1,31 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
- * Apply stored procedure migration directly
+ * Apply pending Supabase migrations using the linked project.
+ *
+ * This intentionally delegates to the official Supabase CLI instead of relying
+ * on ad hoc SQL-execution helpers in the database.
  */
 
-const { createClient } = require('@supabase/supabase-js')
-const fs = require('fs')
+const { spawnSync } = require('child_process')
 
-const supabaseUrl = 'https://gxoaatptsggydujezigr.supabase.co'
-const supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4b2FhdHB0c2dneWR1amV6aWdyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU1MjIwMiwiZXhwIjoyMDg5MTI4MjAyfQ.OyJ08fKugMki19IfB6xAxwzuaBEetgwQyf6liyHYK44'
+function run() {
+  const result = spawnSync('supabase', ['db', 'push', '--linked'], {
+    stdio: 'inherit',
+    cwd: process.cwd(),
+  })
 
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    persistSession: false
+  if (result.error) {
+    throw result.error
   }
-})
 
-async function applyMigration() {
-  console.log('Reading migration file...')
-  const migrationSQL = fs.readFileSync('./supabase/migrations/20260317000001_create_contract_stored_procedure.sql', 'utf8')
-  
-  console.log('Applying stored procedure migration...')
-  
-  const { data, error } = await supabase.rpc('exec_sql', { sql: migrationSQL })
-  
-  if (error) {
-    console.error('Error applying migration:', error)
-    throw error
+  if (typeof result.status === 'number' && result.status !== 0) {
+    process.exit(result.status)
   }
-  
-  console.log('✅ Migration applied successfully!')
-  console.log('Result:', data)
 }
 
-applyMigration()
+try {
+  run()
+} catch (error) {
+  console.error('Failed to apply Supabase migrations:', error instanceof Error ? error.message : error)
+  process.exit(1)
+}

@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Home,
   FileText,
+  CreditCard,
   Plus,
   Clock,
   LogOut,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { logger } from "@/lib/logger";
 
 interface SidebarProps {
   expanded: boolean;
@@ -22,33 +20,12 @@ interface SidebarProps {
 
 export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarProps) {
   const pathname = usePathname();
-  const { logout } = useAuth();
-  const [user, setUser] = useState<{ email?: string; full_name?: string } | null>(null);
-  
-  // Fetch user profile on mount
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (user) {
-          setUser({
-            email: user.email,
-            full_name: user.user_metadata?.full_name
-          });
-        }
-      } catch (error) {
-        logger.error('Error fetching user:', error, 'DashboardSidebar');
-      }
-    }
-    
-    fetchUser();
-  }, []);
+  const { user, logout, loading } = useAuth();
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
     { id: "contracts", label: "Contracts", icon: FileText, href: "/dashboard/contracts" },
+    { id: "billing", label: "Billing", icon: CreditCard, href: "/dashboard/billing" },
   ];
 
   const actionItems = [
@@ -150,7 +127,7 @@ export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarP
         {/* User Section */}
         <div className="p-3 border-t border-white/[0.08]">
           {/* User Profile */}
-          {user && (
+          {!loading && user && (
             <div className="flex items-center gap-3 mb-3">
               {/* Avatar with initials */}
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
@@ -170,15 +147,16 @@ export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarP
           )}
           
           {/* Logout Button */}
-          <form action={logout} className="mt-2">
+          <div className="mt-2">
             <button
-              type="submit"
+              type="button"
+              onClick={() => void logout()}
               className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm"
             >
               <LogOut className="w-4 h-4" />
               Sign out
             </button>
-          </form>
+          </div>
         </div>
       </div>
     </aside>

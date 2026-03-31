@@ -28,11 +28,6 @@ export function useScrollReveal(threshold = 0.1) {
   return { ref, isVisible };
 }
 
-// Dotted Background Component
-export function DottedBackground() {
-  return <div className="dotted-background" aria-hidden="true" />;
-}
-
 // Typing Effect Hook
 export function useTypingEffect(text: string, speed: number = 50, delay: number = 0) {
   const [displayedText, setDisplayedText] = useState("");

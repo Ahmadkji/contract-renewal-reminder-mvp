@@ -4,9 +4,26 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000 2>&1 | tee dev.log",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
-    "lint": "eslint ."
+    "check:api-access-policy": "node scripts/verify-api-access-policy.js",
+    "build": "npm run check:api-access-policy && next build && node scripts/postbuild-standalone.js",
+    "start": "NODE_ENV=production node -r ./scripts/load-env.js .next/standalone/server.js 2>&1 | tee server.log",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "audit:security": "npm audit --audit-level=high --omit=dev",
+    "test:smoke": "playwright test tests/e2e/dashboard-contract.smoke.spec.ts",
+    "test:e2e:smoke": "playwright test tests/e2e/homepage.smoke.spec.ts",
+    "test:integration": "npm run test:contracts-search-regression",
+    "test:subscriptions": "SUBSCRIPTION_TEST_LANE=deterministic node tests/integration/subscription-production-safety.test.js",
+    "test:subscriptions:live": "SUBSCRIPTION_TEST_LANE=live node tests/integration/subscription-production-safety.test.js",
+    "test:billing-pricing": "node tests/integration/billing-pricing-api.test.js",
+    "test:rate-limit-persistence": "node tests/integration/rate-limit-persistence.test.js",
+    "test:checkout-throttle-dedupe": "node tests/integration/checkout-throttling-dedupe.test.js",
+    "test:reminders": "node tests/integration/reminder-processor-schema-regression.test.js",
+    "test:contracts-search-regression": "node tests/integration/contracts-search-escape-regression.test.js",
+    "test:webhook-claim-concurrency": "node tests/integration/webhook-worker-claim-concurrency.test.js",
+    "ops:reminders-health": "node scripts/ops/reminders-health-check.js",
+    "ops:contracts-explain": "node scripts/ops/contracts-query-plan-check.js",
+    "ci:verify": "npm run lint && npm run typecheck && npm run test:integration && npm run test:e2e:smoke && npm run audit:security"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -54,7 +71,7 @@
     "framer-motion": "^12.36.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.525.0",
-    "next": "^16.1.1",
+    "next": "^16.2.1",
     "next-auth": "^4.24.11",
     "next-intl": "^4.3.4",
     "next-themes": "^0.4.6",
@@ -64,7 +81,7 @@
     "react-hook-form": "^7.60.0",
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^3.0.3",
-    "react-syntax-highlighter": "^15.6.1",
+    "react-syntax-highlighter": "^16.1.1",
     "recharts": "^2.15.4",
     "resend": "^6.9.3",
     "sharp": "^0.34.3",
@@ -83,10 +100,14 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "bun-types": "^1.3.4",
+    "creem-cli": "https://github.com/armitage-labs/creem-cli/releases/download/v0.1.3/creem-cli-0.1.3.tgz",
     "eslint": "^9",
-    "eslint-config-next": "^16.1.1",
+    "eslint-config-next": "^16.2.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
+  },
+  "overrides": {
+    "picomatch": "^4.0.4"
   }
 }

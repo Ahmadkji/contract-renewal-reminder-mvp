@@ -1,17 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import {
   Bell,
   Plus,
   Menu,
-  User,
-  LogOut,
-  ChevronDown,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface HeaderProps {
   isMobile: boolean;
@@ -22,21 +16,6 @@ interface HeaderProps {
 
 export function DashboardHeader({ isMobile, onMenuClick, onAddClick, scrolled }: HeaderProps) {
   const pathname = usePathname();
-  const { logout } = useAuth();
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [userEmail, setUserEmail] = useState<string>("");
-  
-  // Get user email on mount
-  useEffect(() => {
-    const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
-    };
-    fetchUser();
-  }, []);
 
   // Get page title based on route
   const getPageInfo = () => {
@@ -45,6 +24,12 @@ export function DashboardHeader({ isMobile, onMenuClick, onAddClick, scrolled }:
     }
     if (pathname.startsWith("/dashboard/contracts")) {
       return { title: "Contracts", subtitle: "Manage and track all your contracts" };
+    }
+    if (pathname.startsWith("/dashboard/billing")) {
+      return { title: "Billing", subtitle: "Manage your subscription and billing details" };
+    }
+    if (pathname.startsWith("/dashboard/settings")) {
+      return { title: "Settings", subtitle: "Manage your account preferences" };
     }
     return { title: "Dashboard", subtitle: "Overview of your contract renewals" };
   };
@@ -70,37 +55,6 @@ export function DashboardHeader({ isMobile, onMenuClick, onAddClick, scrolled }:
           <button className="w-9 h-9 flex items-center justify-center text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5 focus-ring">
             <Bell className="w-5 h-5" />
           </button>
-          
-          {/* User Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 h-9 px-3 text-sm text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5 focus-ring"
-            >
-              <User className="w-4 h-4" />
-              {!isMobile && <span className="truncate max-w-[150px]">{userEmail}</span>}
-              <ChevronDown className="w-4 h-4" />
-            </button>
-            
-            {/* User Dropdown */}
-            {userMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-50">
-                <div className="p-2 border-b border-white/10">
-                  <p className="text-xs text-[#a3a3a3]">Signed in as</p>
-                  <p className="text-sm text-white font-medium truncate">{userEmail}</p>
-                </div>
-                <form action={logout}>
-                  <button
-                    type="submit"
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#a3a3a3] hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
           
           {/* Add Button */}
           <button

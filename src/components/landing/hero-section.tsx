@@ -1,10 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { useAuth } from "@/components/auth";
 
 export function HeroSection() {
-  const { openAuth } = useAuth();
   return (
     <section className="relative z-10 pt-32 sm:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto text-center">
@@ -42,13 +41,13 @@ export function HeroSection() {
         {/* CTA Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-4">
           {/* Primary CTA - Start Free */}
-          <button
-            onClick={() => openAuth('signup')}
+          <Link
+            href="/signup"
             className="animate-hero-cta-primary group w-full sm:w-auto h-12 px-7 text-[14px] font-medium bg-white text-black rounded-md hover:bg-slate-200 transition-all duration-200 flex items-center justify-center gap-2 focus-ring"
           >
             Start Free
             <ArrowRight className="w-4 h-4 transition-transform duration-200 group-hover:translate-x-1" />
-          </button>
+          </Link>
           {/* Secondary CTA - See How It Works */}
           <button 
             onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}

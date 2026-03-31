@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Test script to verify contract creation works with a real authenticated user
  * Run with: node test-contract-creation-with-user.js
@@ -11,9 +12,10 @@
  */
 
 const { createClient } = require('@supabase/supabase-js')
+const { requireEnv } = require('./scripts/load-env')
 
-const supabaseUrl = 'https://gxoaatptsggydujezigr.supabase.co'
-const supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4b2FhdHB0c2dneWR1amV6aWdyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU1MjIwMiwiZXhwIjoyMDg5MTI4MjAyfQ.OyJ08fKugMki19IfB6xAxwzuaBEetgwQyf6liyHYK44'
+const supabaseUrl = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+const supabaseServiceRoleKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 // Test data
 const testEmail = `test-contract-${Date.now()}@example.com`

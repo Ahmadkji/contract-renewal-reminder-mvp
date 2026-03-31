@@ -3,46 +3,64 @@
 import { useState, useEffect } from 'react'
 import { User, Bell, Shield, LogOut, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { logout } from '@/actions/auth'
 import { updateProfileAction } from '@/actions/auth'
 import { toast } from '@/hooks/use-toast'
+import { useAuth } from '@/contexts/AuthContext'
 
 export default function SettingsPage() {
+  const { user, logout, loading: authLoading } = useAuth()
   const [userEmail, setUserEmail] = useState<string>('')
   const [fullName, setFullName] = useState<string>('')
   const [avatarUrl, setAvatarUrl] = useState<string>('')
   const [emailNotifications, setEmailNotifications] = useState<boolean>(true)
   const [timezone, setTimezone] = useState<string>('UTC')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   // Load user profile on mount
   useEffect(() => {
+    if (authLoading) {
+      return
+    }
+
     const loadProfile = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user?.email) {
-        setUserEmail(user.email)
-        
-        // Load profile from database
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-        
-        if (profile) {
-          setFullName(profile.full_name || '')
-          setAvatarUrl(profile.avatar_url || '')
-          setEmailNotifications(profile.email_notifications ?? true)
-          setTimezone(profile.timezone || 'UTC')
-        }
+      if (!user?.id) {
+        setUserEmail('')
+        setLoading(false)
+        return
       }
+
+      setLoading(true)
+      const supabase = createClient()
+
+      setUserEmail(user.email || '')
+      setFullName(user.full_name || '')
+
+      // Load profile from database
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('[Settings] Failed to load profile:', error)
+        setLoading(false)
+        return
+      }
+
+      if (profile) {
+        setFullName(profile.full_name || '')
+        setAvatarUrl(profile.avatar_url || '')
+        setEmailNotifications(profile.email_notifications ?? true)
+        setTimezone(profile.timezone || 'UTC')
+      }
+
+      setLoading(false)
     }
     
-    loadProfile()
-  }, [])
+    void loadProfile()
+  }, [authLoading, user?.email, user?.full_name, user?.id])
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -167,24 +185,11 @@ export default function SettingsPage() {
               </button>
             </div>
             
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-white block">Reminder emails</label>
-                <p className="text-xs text-[#a3a3a3]">Get contract renewal reminders</p>
-              </div>
-              <button
-                onClick={() => setEmailNotifications(!emailNotifications)}
-                className={`w-12 h-6 rounded-full relative transition-colors ${
-                  emailNotifications ? 'bg-cyan-600' : 'bg-slate-700'
-                }`}
-              >
-                <input type="checkbox" checked={emailNotifications} className="sr-only" />
-                <div
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    emailNotifications ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+            <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3">
+              <label className="text-sm font-medium text-white block">Reminder emails</label>
+              <p className="text-xs text-[#a3a3a3] mt-1">
+                Controlled per contract. If global email notifications are off, reminder delivery is skipped.
+              </p>
             </div>
           </div>
         </div>

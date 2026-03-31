@@ -6,11 +6,78 @@ export class AuthError extends Error {
   constructor(
     message: string,
     public code: string,
-    public statusCode: number = 500
+    public statusCode: number = 500,
+    public retryAfterSeconds: number | null = null
   ) {
     super(message)
     this.name = 'AuthError'
   }
+}
+
+function buildAuthErrorLogPayload(error: any): { message: string; status?: number; code?: string } {
+  return {
+    message: typeof error?.message === 'string' ? error.message : 'Unknown auth error',
+    status: typeof error?.status === 'number' ? error.status : undefined,
+    code: typeof error?.code === 'string' ? error.code : undefined,
+  }
+}
+
+function logAuthError(label: string, error: any): void {
+  const payload = buildAuthErrorLogPayload(error)
+
+  if (process.env.NODE_ENV === 'development') {
+    console.error(label, payload)
+    return
+  }
+
+  console.warn(label, payload)
+}
+
+function normalizeRetryAfterSeconds(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.max(1, Math.min(3600, Math.trunc(value)))
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10)
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.max(1, Math.min(3600, parsed))
+    }
+  }
+
+  return null
+}
+
+function parseRetryAfterFromError(error: any): number | null {
+  const directRetryAfter =
+    normalizeRetryAfterSeconds(error?.retryAfterSeconds) ??
+    normalizeRetryAfterSeconds(error?.retry_after) ??
+    normalizeRetryAfterSeconds(error?.retryAfter)
+
+  if (directRetryAfter) {
+    return directRetryAfter
+  }
+
+  const headers =
+    error?.headers && typeof error.headers === 'object'
+      ? error.headers
+      : null
+
+  const headerRetryAfter =
+    normalizeRetryAfterSeconds(headers?.['retry-after']) ??
+    normalizeRetryAfterSeconds(headers?.['Retry-After'])
+
+  if (headerRetryAfter) {
+    return headerRetryAfter
+  }
+
+  const message = typeof error?.message === 'string' ? error.message : ''
+  const match = message.match(/(\d+)\s*(seconds|second|secs|sec|s)\b/i)
+  if (match?.[1]) {
+    return normalizeRetryAfterSeconds(match[1])
+  }
+
+  return null
 }
 
 /**
@@ -22,8 +89,7 @@ export function mapSupabaseError(error: any): AuthError {
   const status = error?.status || 500
   const code = error?.code || ''
 
-  // Debug logging for unhandled errors (remove in production)
-  console.error('Supabase Auth Error:', { message, status, code, error })
+  logAuthError('Supabase Auth Error:', error)
 
   // Session related errors
   if (message.includes('Auth session missing') ||
@@ -130,10 +196,12 @@ export function mapSupabaseError(error: any): AuthError {
   if (message.includes('Too many requests') ||
       message.includes('rate limit') ||
       status === 429) {
+    const retryAfterSeconds = parseRetryAfterFromError(error)
     return new AuthError(
       'Too many attempts. Please try again later.',
       'RATE_LIMITED',
-      429
+      429,
+      retryAfterSeconds
     )
   }
 
@@ -173,7 +241,7 @@ export function mapSupabaseError(error: any): AuthError {
   }
 
   // Default secure error - log for debugging
-  console.error('Unhandled Supabase Auth Error:', { message, status, code })
+  logAuthError('Unhandled Supabase Auth Error:', error)
   return new AuthError(
     'An authentication error occurred. Please try again.',
     'AUTH_ERROR',

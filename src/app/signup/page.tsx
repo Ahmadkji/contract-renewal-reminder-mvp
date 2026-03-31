@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { signup } from '@/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -19,16 +18,57 @@ const passwordRequirements = [
   { id: 'special', label: 'One special character', test: (p: string) => /[!@#$%^&*(),.?":{}|<>]/.test(p) },
 ]
 
+function normalizeRetryAfterSeconds(value: unknown, fallback: number = 30): number {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : NaN
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.max(1, Math.min(300, Math.trunc(parsed)))
+}
+
 export default function SignupPage() {
-  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string>('')
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState<string>('')
   const [password, setPassword] = useState('')
+  const [signupCooldownUntilMs, setSignupCooldownUntilMs] = useState(0)
+  const [signupCooldownNowMs, setSignupCooldownNowMs] = useState(0)
+
+  useEffect(() => {
+    if (signupCooldownUntilMs <= Date.now()) {
+      return
+    }
+
+    const timer = setInterval(() => {
+      setSignupCooldownNowMs(Date.now())
+      if (Date.now() >= signupCooldownUntilMs) {
+        clearInterval(timer)
+      }
+    }, 250)
+
+    return () => clearInterval(timer)
+  }, [signupCooldownUntilMs])
+
+  const signupCooldownSeconds =
+    signupCooldownUntilMs > signupCooldownNowMs
+      ? Math.max(0, Math.ceil((signupCooldownUntilMs - signupCooldownNowMs) / 1000))
+      : 0
 
   const handleSubmit = async (formData: FormData) => {
+    if (signupCooldownSeconds > 0) {
+      setFormError(`Too many attempts. Try again in ${signupCooldownSeconds}s.`)
+      return
+    }
+
     setErrors({})
     setFormError('')
     setSuccess(false)
@@ -42,6 +82,14 @@ export default function SignupPage() {
         }
         if (result.error) {
           setFormError(result.error)
+        }
+
+        if (result.code === 'RATE_LIMITED') {
+          const retryAfterSeconds = normalizeRetryAfterSeconds(result.retryAfterSeconds, 30)
+          const now = Date.now()
+          setSignupCooldownNowMs(now)
+          setSignupCooldownUntilMs(now + retryAfterSeconds * 1000)
+          setFormError(result.error || `Too many attempts. Try again in ${retryAfterSeconds}s.`)
         }
       } else {
         // Success
@@ -203,7 +251,7 @@ export default function SignupPage() {
                 type="text"
                 placeholder="John Doe"
                 autoComplete="name"
-                disabled={isPending}
+                disabled={isPending || signupCooldownSeconds > 0}
                 className="h-12 bg-[#0f0f0f] border border-white/10 text-white placeholder:text-slate-500 focus:border-white focus:ring-white/20"
               />
               {errors.fullName && (
@@ -219,7 +267,7 @@ export default function SignupPage() {
                 type="email"
                 placeholder="you@example.com"
                 autoComplete="email"
-                disabled={isPending}
+                disabled={isPending || signupCooldownSeconds > 0}
                 className="h-12 bg-[#0f0f0f] border border-white/10 text-white placeholder:text-slate-500 focus:border-white focus:ring-white/20"
               />
               {errors.email && (
@@ -235,7 +283,7 @@ export default function SignupPage() {
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="new-password"
-                disabled={isPending}
+                disabled={isPending || signupCooldownSeconds > 0}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="h-12 bg-[#0f0f0f] border border-white/10 text-white placeholder:text-slate-500 focus:border-white focus:ring-white/20"
@@ -269,13 +317,15 @@ export default function SignupPage() {
             <Button 
               type="submit" 
               className="w-full h-12 bg-white hover:bg-slate-200 text-black font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isPending || (password.length > 0 && !allRequirementsMet)}
+              disabled={isPending || signupCooldownSeconds > 0 || (password.length > 0 && !allRequirementsMet)}
             >
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Creating account...
                 </>
+              ) : signupCooldownSeconds > 0 ? (
+                <>Try again in {signupCooldownSeconds}s</>
               ) : (
                 <>
                   Create account

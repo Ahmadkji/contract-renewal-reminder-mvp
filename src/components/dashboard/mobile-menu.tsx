@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   FileText,
+  CreditCard,
   Plus,
   Clock,
   X,
@@ -21,6 +22,7 @@ export function MobileMenu({ onAddClick, onClose }: MobileMenuProps) {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
     { id: "contracts", label: "Contracts", icon: FileText, href: "/dashboard/contracts" },
+    { id: "billing", label: "Billing", icon: CreditCard, href: "/dashboard/billing" },
   ];
 
   const actionItems = [

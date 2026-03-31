@@ -4,6 +4,8 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Calendar, ChevronDown } from "lucide-react"
 
+const FALLBACK_VIEW_DATE = new Date("2000-01-01T00:00:00.000Z")
+
 // ============================================
 // Form Field Wrapper
 // ============================================
@@ -210,8 +212,15 @@ export function DatePicker({
   className,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const [viewDate, setViewDate] = React.useState(value || new Date())
+  const [viewDate, setViewDate] = React.useState<Date>(value ?? FALLBACK_VIEW_DATE)
+  const [today, setToday] = React.useState<Date | null>(null)
   const pickerRef = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    const currentDate = new Date()
+    setToday(currentDate)
+    setViewDate(value ?? currentDate)
+  }, [value])
 
   // Close on outside click
   React.useEffect(() => {
@@ -248,7 +257,7 @@ export function DatePicker({
   }
 
   const isToday = (day: number) => {
-    const today = new Date()
+    if (!today) return false
     return (
       today.getDate() === day &&
       today.getMonth() === viewDate.getMonth() &&
@@ -361,6 +370,10 @@ export function CurrencyInput({ value, onChange, error, className, ...props }: C
   const [displayValue, setDisplayValue] = React.useState(
     value ? value.toLocaleString() : ""
   )
+
+  React.useEffect(() => {
+    setDisplayValue(value ? value.toLocaleString() : "")
+  }, [value])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = e.target.value.replace(/[^0-9.]/g, "")

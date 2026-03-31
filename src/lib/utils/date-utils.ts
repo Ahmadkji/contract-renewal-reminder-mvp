@@ -5,9 +5,42 @@
  * that work with both Date objects and ISO 8601 strings.
  */
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function formatLocalDateParts(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateOnlyString(date: string): Date | null {
+  if (!DATE_ONLY_PATTERN.test(date)) {
+    return null;
+  }
+
+  const [year, month, day] = date.split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+export function isDateOnlyString(value: string): boolean {
+  return DATE_ONLY_PATTERN.test(value);
+}
+
 /**
  * Parse ISO date string to Date object safely
- * Handles Date objects, ISO strings, and null/undefined values
+ * Handles Date objects, date-only strings, ISO strings, and null/undefined values.
+ * Date-only strings are parsed as local calendar dates so they don't shift by timezone.
  * 
  * @param date - Date object, ISO string, or null/undefined
  * @returns Date object or null if invalid
@@ -15,6 +48,12 @@
 export function parseDate(date: string | Date | null | undefined): Date | null {
   if (!date) return null;
   if (date instanceof Date) return date;
+
+  const dateOnly = parseDateOnlyString(date);
+  if (dateOnly) {
+    return dateOnly;
+  }
+
   try {
     const parsed = new Date(date);
     return isNaN(parsed.getTime()) ? null : parsed;
@@ -163,9 +202,24 @@ export function toISOString(date: string | Date): string {
  * @returns Date-only string (e.g., "2024-12-31") or empty string
  */
 export function toDateString(date: string | Date): string {
+  return toDateOnlyString(date);
+}
+
+/**
+ * Format date to date-only string (YYYY-MM-DD) for database
+ *
+ * @param date - Date object or ISO string
+ * @returns Date-only string (e.g., "2024-12-31") or empty string
+ */
+export function toDateOnlyString(date: string | Date | null | undefined): string {
+  if (!date) return '';
+  if (typeof date === 'string' && isDateOnlyString(date)) {
+    return date;
+  }
+
   const dateObj = parseDate(date);
   if (!dateObj) return '';
-  return dateObj.toISOString().split('T')[0];
+  return formatLocalDateParts(dateObj);
 }
 
 /**

@@ -72,6 +72,9 @@ export interface SendEmailResult {
   
   /** HTTP status code (if failed) */
   statusCode?: number;
+
+  /** Optional retry hint (seconds) from provider rate-limit response */
+  retryAfterSeconds?: number;
   
   /** Additional error details */
   details?: any;

@@ -1,30 +1,10 @@
+import type { ContractFormData } from "@/types/contract";
+
 // ============================================
 // Add Contract Form Types
 // ============================================
 
-export type ContractFormData = {
-  // Step 1: Basic Info
-  name: string;
-  type: "license" | "service" | "support" | "subscription";
-  startDate: Date | null;
-  endDate: Date | null;
-  
-  // Step 2: Vendor & Terms
-  vendor: string;
-  vendorContact: string;
-  vendorEmail: string;
-  value: number;
-  currency: string;
-  autoRenew: boolean;
-  renewalTerms: string;
-  
-  // Step 3: Reminders & Notes
-  reminderDays: number[];
-  emailReminders: boolean;
-  notifyEmails: string[];
-  notes: string;
-  tags: string[];
-}
+export type { ContractFormData };
 
 export const initialFormData: ContractFormData = {
   name: "",

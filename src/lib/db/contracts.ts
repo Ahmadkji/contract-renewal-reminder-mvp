@@ -1,38 +1,82 @@
 import { createClient } from '@/lib/supabase/server'
-import { Contract, ContractInput } from '@/types/contract'
+import { ContractInput } from '@/types/contract'
+import { formatDate, getDaysUntil, toDateOnlyString } from '@/lib/utils/date-utils'
+import { logger } from '@/lib/logger'
 
 // Helper function to get authenticated Supabase client (uses RLS)
 const getSupabase = async () => {
   return await createClient()
 }
 
-/**
- * Convert Date object or ISO string to UTC date string (YYYY-MM-DD)
- * 
- * FIX: Now handles both Date objects and ISO strings
- * - For Date objects: extracts components in local timezone (preserves user's selection)
- * - For ISO strings: parses and extracts date-only part
- * 
- * This ensures timezone-safe date storage without date shifting
- */
-function toUTCDateOnly(date: Date | string): string {
-  // If already a string in YYYY-MM-DD format, return as-is
-  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return date;
+export type ContractsCountMode = 'planned' | 'exact'
+
+function normalizeCountMode(mode?: ContractsCountMode): 'planned' | 'exact' {
+  return mode === 'exact' ? 'exact' : 'planned'
+}
+
+function normalizeOptionalString(value?: string | null): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function normalizeStringArray(values?: string[] | null): string[] {
+  return Array.from(
+    new Set(
+      (values || [])
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function normalizeReminderDays(reminderDays?: number[] | null): number[] {
+  return Array.from(
+    new Set(
+      (reminderDays || []).filter(
+        (days) => Number.isInteger(days) && days >= 1 && days <= 365
+      )
+    )
+  ).sort((left, right) => left - right)
+}
+
+function requireDateOnlyString(value: string | Date | undefined, fieldName: string): string {
+  const formatted = value ? toDateOnlyString(value) : ''
+
+  if (!formatted) {
+    throw new Error(`${fieldName} is required`)
   }
-  
-  // Parse the date
-  const d = typeof date === 'string' ? new Date(date) : date;
-  
-  // Get date components in local timezone to preserve user's intended date
-  // This prevents timezone-based date shifting (e.g., UTC+5 user selecting Jan 1)
-  const year = d.getFullYear();
-  const month = d.getMonth();
-  const day = d.getDate();
-  
-  // Format as YYYY-MM-DD (local timezone - no UTC conversion)
-  // Database stores as DATE type which handles timezone appropriately
-  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+  return formatted
+}
+
+function normalizeContractMutationInput(input: ContractInput) {
+  const vendorContact = normalizeOptionalString(input.vendorContact)
+  const vendorEmail = normalizeOptionalString(input.vendorEmail)
+
+  if (Boolean(vendorContact) !== Boolean(vendorEmail)) {
+    throw new Error('Vendor contact and vendor email must both be provided together')
+  }
+
+  return {
+    name: input.name.trim(),
+    vendor: input.vendor.trim(),
+    type: input.type,
+    startDate: requireDateOnlyString(input.startDate, 'Start date'),
+    endDate: requireDateOnlyString(input.endDate, 'End date'),
+    value: input.value ?? null,
+    currency: input.currency || 'USD',
+    autoRenew: input.autoRenew ?? false,
+    renewalTerms: normalizeOptionalString(input.renewalTerms),
+    notes: normalizeOptionalString(input.notes),
+    tags: normalizeStringArray(input.tags),
+    vendorContact,
+    vendorEmail,
+    reminderDays: normalizeReminderDays(input.reminderDays),
+    emailReminders: input.emailReminders ?? false,
+    notifyEmails: input.emailReminders === false
+      ? []
+      : normalizeStringArray(input.notifyEmails),
+  }
 }
 
 export interface ActivityItem {
@@ -48,8 +92,8 @@ export interface ContractWithDetails {
   name: string
   vendor: string
   type: 'license' | 'service' | 'support' | 'subscription'
-  startDate: string  // ISO 8601 string from database
-  endDate: string    // ISO 8601 string from database
+  startDate: string  // YYYY-MM-DD string from database
+  endDate: string    // YYYY-MM-DD string from database
   expiryDate: string
   daysLeft: number
   status: 'active' | 'expiring' | 'critical' | 'renewing'
@@ -69,14 +113,96 @@ export interface ContractWithDetails {
   activity: ActivityItem[]
 }
 
+export interface ContractsQueryTimings {
+  countMs: number
+  listMs: number
+  cacheHit?: boolean
+}
+
+function logContractsDbError(message: string, error: unknown): void {
+  logger.error(message, error, 'ContractsDB')
+}
+
+const CONTRACTS_PAGE_CACHE_TTL_MS = (() => {
+  const parsed = Number.parseInt(process.env.CONTRACTS_PAGE_CACHE_TTL_MS || '1500', 10)
+  if (!Number.isFinite(parsed)) {
+    return 1500
+  }
+  return Math.max(0, Math.min(parsed, 60_000))
+})()
+const CONTRACTS_PAGE_CACHE_MAX_ENTRIES = 2_000
+const contractsPageCache = new Map<
+  string,
+  {
+    expiresAt: number
+    value: { contracts: ContractWithDetails[]; total: number }
+  }
+>()
+
+function buildContractsPageCacheKey(
+  userId: string,
+  page: number,
+  pageSize: number,
+  countMode: ContractsCountMode,
+  options: { search?: string | null; upcoming?: boolean }
+): string {
+  const normalizedSearch = options.search?.trim() || ''
+  const normalizedUpcoming = options.upcoming ? '1' : '0'
+  return `${userId}:${Math.max(1, page)}:${Math.max(1, pageSize)}:${normalizeCountMode(countMode)}:${normalizedUpcoming}:${normalizedSearch}`
+}
+
+function getCachedContractsPage(cacheKey: string): { contracts: ContractWithDetails[]; total: number } | null {
+  const cached = contractsPageCache.get(cacheKey)
+  if (!cached) {
+    return null
+  }
+
+  if (cached.expiresAt <= Date.now()) {
+    contractsPageCache.delete(cacheKey)
+    return null
+  }
+
+  return cached.value
+}
+
+function setCachedContractsPage(
+  cacheKey: string,
+  value: { contracts: ContractWithDetails[]; total: number }
+): void {
+  contractsPageCache.set(cacheKey, {
+    expiresAt: Date.now() + CONTRACTS_PAGE_CACHE_TTL_MS,
+    value,
+  })
+
+  while (contractsPageCache.size > CONTRACTS_PAGE_CACHE_MAX_ENTRIES) {
+    const oldestKey = contractsPageCache.keys().next().value as string | undefined
+    if (!oldestKey) {
+      break
+    }
+    contractsPageCache.delete(oldestKey)
+  }
+}
+
+export function invalidateContractsPageCache(userId?: string): void {
+  if (!userId) {
+    contractsPageCache.clear()
+    return
+  }
+
+  const prefix = `${userId}:`
+  for (const key of contractsPageCache.keys()) {
+    if (key.startsWith(prefix)) {
+      contractsPageCache.delete(key)
+    }
+  }
+}
+
 // Calculate days remaining and status
-export function calculateContractStatus(endDate: Date): {
+export function calculateContractStatus(endDate: string | Date): {
   daysLeft: number
   status: 'active' | 'expiring' | 'critical' | 'renewing'
 } {
-  const today = new Date()
-  const diffTime = endDate.getTime() - today.getTime()
-  const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const daysLeft = getDaysUntil(endDate)
   
   let status: 'active' | 'expiring' | 'critical' | 'renewing' = 'active'
   
@@ -89,100 +215,213 @@ export function calculateContractStatus(endDate: Date): {
   return { daysLeft, status }
 }
 
+function toObjectArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object')
+}
+
+function toStringValue(value: unknown, fallback: string = ''): string {
+  if (typeof value === 'string') {
+    return value
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  return fallback
+}
+
+function toBooleanValue(value: unknown, fallback: boolean = false): boolean {
+  if (typeof value === 'boolean') {
+    return value
+  }
+  return fallback
+}
+
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.map((item) => toStringValue(item)).filter(Boolean)
+}
+
+function parseContractType(value: unknown): ContractWithDetails['type'] {
+  const parsed = toStringValue(value).trim().toLowerCase()
+  switch (parsed) {
+    case 'license':
+    case 'service':
+    case 'support':
+    case 'subscription':
+      return parsed
+    default:
+      return 'service'
+  }
+}
+
 // Transform database record to Contract type
-function transformContract(record: any): ContractWithDetails {
-  const { daysLeft, status } = calculateContractStatus(new Date(record.end_date))
+function transformContract(record: Record<string, unknown>): ContractWithDetails {
+  const endDate = toStringValue(record.end_date)
+  const { daysLeft, status } = calculateContractStatus(endDate)
   
   // Safe access to reminders array
-  const reminders = Array.isArray(record.reminders) ? record.reminders : []
+  const reminders = toObjectArray(record.reminders)
+  const vendorContacts = toObjectArray(record.vendor_contacts)
+  const firstReminder = reminders[0]
+  const firstVendorContact = vendorContacts[0]
   
   return {
-    id: record.id,
-    name: record.name,
-    vendor: record.vendor,
-    type: record.type,
-    expiryDate: new Date(record.end_date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    }),
+    id: toStringValue(record.id),
+    name: toStringValue(record.name),
+    vendor: toStringValue(record.vendor),
+    type: parseContractType(record.type),
+    expiryDate: formatDate(endDate),
     daysLeft,
     status,
-    value: record.value,
-    startDate: record.start_date,  // Keep as string from database
-    endDate: record.end_date,      // Keep as string from database
-    currency: record.currency,
-    autoRenew: record.auto_renew,
-    renewalTerms: record.renewal_terms,
-    notes: record.notes,
-    tags: record.tags || [],
-    vendorContact: record.vendor_contacts?.[0]?.contact_name,
-    vendorEmail: record.vendor_contacts?.[0]?.email,
+    value: toFiniteNumber(record.value, 0),
+    startDate: toStringValue(record.start_date),  // Keep as string from database
+    endDate,      // Keep as string from database
+    currency: toStringValue(record.currency, 'USD'),
+    autoRenew: toBooleanValue(record.auto_renew),
+    renewalTerms: toStringValue(record.renewal_terms),
+    notes: toStringValue(record.notes),
+    tags: toStringArray(record.tags),
+    vendorContact: toStringValue(firstVendorContact?.contact_name),
+    vendorEmail: toStringValue(firstVendorContact?.email),
     // Safe mapping with fallback
-    reminderDays: reminders.map((r: any) => r.days_before),
-    // Safe access with fallback
-    emailReminders: reminders.length > 0 && reminders[0].notify_emails?.length > 0,
-    notifyEmails: reminders.length > 0 ? (reminders[0].notify_emails || []) : [],
+    reminderDays: reminders
+      .map((reminder) => Math.trunc(toFiniteNumber(reminder.days_before, 0)))
+      .filter((days) => days > 0),
+    emailReminders: toBooleanValue(record.email_reminders, false),
+    notifyEmails: toStringArray(firstReminder?.notify_emails),
     // Add missing fields
-    createdAt: record.created_at || new Date().toISOString(),
-    updatedAt: record.updated_at || new Date().toISOString(),
+    createdAt: toStringValue(record.created_at, new Date().toISOString()),
+    updatedAt: toStringValue(record.updated_at, new Date().toISOString()),
     // Add activity field (empty array for now)
     activity: []
   }
+}
+
+function transformContractListRecord(record: Record<string, unknown>): ContractWithDetails {
+  const endDate = toStringValue(record.end_date || record.endDate || '')
+  const startDate = toStringValue(record.start_date || record.startDate || '')
+  const { daysLeft, status } = calculateContractStatus(endDate)
+
+  return {
+    id: toStringValue(record.id),
+    name: toStringValue(record.name),
+    vendor: toStringValue(record.vendor),
+    type: parseContractType(record.type),
+    expiryDate: endDate ? formatDate(endDate) : '',
+    daysLeft,
+    status,
+    value: toFiniteNumber(record.value, 0),
+    startDate,
+    endDate,
+    currency: toStringValue(record.currency, 'USD'),
+    autoRenew: toBooleanValue(record.auto_renew ?? record.autoRenew, false),
+    renewalTerms: '',
+    notes: '',
+    tags: toStringArray(record.tags),
+    emailReminders: toBooleanValue(record.email_reminders ?? record.emailReminders, false),
+    notifyEmails: [],
+    createdAt: toStringValue(record.created_at || record.createdAt, new Date().toISOString()),
+    updatedAt: toStringValue(record.updated_at || record.updatedAt, new Date().toISOString()),
+    activity: [],
+  }
+}
+
+function toFiniteNumber(value: unknown, fallback: number = 0): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+async function fetchContractsPage(
+  userId: string,
+  page: number,
+  pageSize: number,
+  countMode: ContractsCountMode,
+  options: {
+    search?: string | null
+    upcoming?: boolean
+  } = {}
+): Promise<{ contracts: ContractWithDetails[]; total: number; timings: ContractsQueryTimings }> {
+  const normalizedCountMode = normalizeCountMode(countMode)
+  const cacheEnabled = CONTRACTS_PAGE_CACHE_TTL_MS > 0 && normalizedCountMode === 'planned'
+  const cacheKey = cacheEnabled
+    ? buildContractsPageCacheKey(userId, page, pageSize, normalizedCountMode, options)
+    : null
+
+  if (cacheKey) {
+    const cached = getCachedContractsPage(cacheKey)
+    if (cached) {
+      return {
+        contracts: cached.contracts,
+        total: cached.total,
+        timings: {
+          countMs: 0,
+          listMs: 0,
+          cacheHit: true,
+        },
+      }
+    }
+  }
+
+  const supabase = await getSupabase()
+
+  const { data, error } = await supabase.rpc('get_contracts_page_payload', {
+    p_user_id: userId,
+    p_page: Math.max(1, page),
+    p_limit: Math.max(1, pageSize),
+    p_search: options.search?.trim() || null,
+    p_upcoming: Boolean(options.upcoming),
+    p_count_mode: normalizedCountMode,
+  })
+
+  if (error) {
+    logContractsDbError('Error fetching paginated contracts via RPC', error)
+    throw error
+  }
+
+  const payload =
+    data && typeof data === 'string'
+      ? JSON.parse(data)
+      : (data as {
+          contracts?: Array<Record<string, unknown>>
+          total?: number
+          timings?: { countMs?: number; listMs?: number }
+        } | null)
+
+  const rows = Array.isArray(payload?.contracts) ? payload.contracts : []
+
+  const result = {
+    contracts: rows.map(transformContractListRecord),
+    total: Math.max(0, Math.trunc(toFiniteNumber(payload?.total, 0))),
+    timings: {
+      countMs: Number(toFiniteNumber(payload?.timings?.countMs, 0).toFixed(2)),
+      listMs: Number(toFiniteNumber(payload?.timings?.listMs, 0).toFixed(2)),
+      cacheHit: false,
+    },
+  }
+
+  if (cacheKey) {
+    setCachedContractsPage(cacheKey, {
+      contracts: result.contracts,
+      total: result.total,
+    })
+  }
+
+  return result
 }
 
 // Get paginated contracts (requires authenticated user)
 export async function getAllContracts(
   userId: string,
   page: number = 1,
-  pageSize: number = 20
-): Promise<{ contracts: ContractWithDetails[]; total: number }> {
-  const supabase = await getSupabase()
-
-  // Auth check required - RLS will filter by user_id
-  // The userId parameter ensures we only fetch this user's contracts
-
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-
-  // Get total count for pagination (filtered by user_id via RLS)
-  const { count, error: countError } = await supabase
-    .from('contracts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-
-  if (countError) {
-    console.error('Error counting contracts:', countError)
-    throw countError
-  }
-
-  // Get paginated data (filtered by user_id via RLS)
-  const { data: contracts, error } = await supabase
-    .from('contracts')
-    .select(`
-      *,
-      vendor_contacts (
-        contact_name,
-        email
-      ),
-      reminders (
-        days_before,
-        notify_emails
-      )
-    `)
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .order('end_date', { ascending: true })
-    .range(from, to)
-
-  if (error) {
-    console.error('Error fetching contracts:', error)
-    throw error
-  }
-
-  return {
-    contracts: contracts?.map(transformContract) || [],
-    total: count || 0
-  }
+  pageSize: number = 20,
+  countMode: ContractsCountMode = 'planned'
+): Promise<{ contracts: ContractWithDetails[]; total: number; timings: ContractsQueryTimings }> {
+  return fetchContractsPage(userId, page, pageSize, countMode)
 }
 
 // Get contract by ID - RLS enforces ownership at database level
@@ -205,6 +444,7 @@ export async function getContractById(id: string, userId?: string): Promise<Cont
       end_date,
       value,
       currency,
+      email_reminders,
       auto_renew,
       renewal_terms,
       notes,
@@ -234,7 +474,7 @@ export async function getContractById(id: string, userId?: string): Promise<Cont
     if (error.code === 'PGRST116') {
       return null
     }
-    console.error('Error fetching contract:', error)
+    logContractsDbError('Error fetching contract', error)
     throw error
   }
 
@@ -251,83 +491,43 @@ export async function createContract(userId: string, input: ContractInput): Prom
 
   // RLS ensures user can only insert with their own user_id
 
-  // Validate dates are present (already validated by API layer)
-  if (!input.startDate || !input.endDate) {
-    throw new Error('Start date and end date are required')
-  }
+  const normalized = normalizeContractMutationInput(input)
 
-  // Convert ISO strings to Date objects for database
-  const startDate = new Date(input.startDate)
-  const endDate = new Date(input.endDate)
-
-  // Create contract with direct INSERT (simpler than stored procedure)
-  const { data: contract, error: contractError } = await supabase
-    .from('contracts')
-    .insert({
-      user_id: userId, // Use authenticated user's ID
-      name: input.name,
-      vendor: input.vendor,
-      type: input.type,
-      start_date: toUTCDateOnly(startDate),
-      end_date: toUTCDateOnly(endDate),
-      value: input.value,
-      currency: input.currency || 'USD',
-      auto_renew: input.autoRenew || false,
-      renewal_terms: input.renewalTerms,
-      notes: input.notes,
-      tags: input.tags || []
-    })
-    .select()
-    .single()
-
-  if (contractError) {
-    console.error('Error creating contract:', contractError)
-    throw new Error(contractError.message || 'Failed to create contract')
-  }
-
-  const contractId = contract.id
-
-  // Insert vendor contact if provided - FIX #10: Make failure fatal
-  if (input.vendorContact && input.vendorEmail) {
-    const { error: contactError } = await supabase
-      .from('vendor_contacts')
-      .insert({
-        contract_id: contractId,
-        contact_name: input.vendorContact,
-        email: input.vendorEmail
-      })
-
-    if (contactError) {
-      console.error('Error creating vendor contact:', contactError)
-      // FIX #10: Throw error to prevent partial data creation
-      throw new Error(`Failed to create vendor contact: ${contactError.message || 'Unknown error'}`)
+  const { data: contractId, error: contractError } = await supabase.rpc(
+    'create_contract_with_relations',
+    {
+      p_user_id: userId,
+      p_name: normalized.name,
+      p_vendor: normalized.vendor,
+      p_type: normalized.type,
+      p_start_date: normalized.startDate,
+      p_end_date: normalized.endDate,
+      p_value: normalized.value,
+      p_currency: normalized.currency,
+      p_auto_renew: normalized.autoRenew,
+      p_renewal_terms: normalized.renewalTerms,
+      p_notes: normalized.notes,
+      p_tags: normalized.tags,
+      p_vendor_contact: normalized.vendorContact,
+      p_vendor_email: normalized.vendorEmail,
+      p_reminder_days: normalized.reminderDays,
+      p_email_reminders: normalized.emailReminders,
+      p_notify_emails: normalized.notifyEmails,
     }
-  }
+  )
 
-  // Insert reminders if provided - FIX #11: Make failure fatal
-  if (input.reminderDays && input.reminderDays.length > 0) {
-    const { error: reminderError } = await supabase
-      .from('reminders')
-      .insert(
-        input.reminderDays.map(days => ({
-          contract_id: contractId,
-          days_before: days,
-          notify_emails: input.notifyEmails || []
-        }))
-      )
-
-    if (reminderError) {
-      console.error('Error creating reminders:', reminderError)
-      // FIX #11: Throw error to prevent partial data creation
-      throw new Error(`Failed to create reminders: ${reminderError.message || 'Unknown error'}`)
-    }
+  if (contractError || !contractId) {
+    logContractsDbError('Error creating contract', contractError)
+    throw new Error(contractError?.message || 'Failed to create contract')
   }
 
   // Fetch complete contract with relations
-  const createdContract = await getContractById(contractId)
+  const createdContract = await getContractById(contractId, userId)
   if (!createdContract) {
     throw new Error('Failed to fetch created contract')
   }
+
+  invalidateContractsPageCache(userId)
 
   return createdContract
 }
@@ -335,120 +535,79 @@ export async function createContract(userId: string, input: ContractInput): Prom
 // Update contract - RLS ensures user can only update their own contracts
 export async function updateContract(
   id: string,
-  input: Partial<ContractInput>
+  input: ContractInput,
+  userId?: string
 ): Promise<ContractWithDetails> {
   const supabase = await getSupabase()
 
   // RLS ensures user can only update their own contracts
 
-  // Validate dates are present if provided (already validated by API layer)
-  if (input.startDate !== undefined && input.startDate !== null && !input.endDate) {
-    throw new Error('Both startDate and endDate must be provided together')
-  }
-  if (input.endDate !== undefined && input.endDate !== null && !input.startDate) {
-    throw new Error('Both startDate and endDate must be provided together')
-  }
+  const normalized = normalizeContractMutationInput(input)
 
-  // Convert ISO strings to Date objects for database
-  const startDate = input.startDate ? new Date(input.startDate) : undefined
-  const endDate = input.endDate ? new Date(input.endDate) : undefined
-
-  // Update contract (RLS filters by user_id automatically)
-  const { error: contractError } = await supabase
-    .from('contracts')
-    .update({
-      name: input.name,
-      vendor: input.vendor,
-      type: input.type,
-      start_date: startDate ? toUTCDateOnly(startDate) : undefined,
-      end_date: endDate ? toUTCDateOnly(endDate) : undefined,
-      value: input.value,
-      currency: input.currency,
-      auto_renew: input.autoRenew,
-      renewal_terms: input.renewalTerms,
-      notes: input.notes,
-      tags: input.tags
-    })
-    .eq('id', id)
-
-  if (contractError) {
-    console.error('Error updating contract:', contractError)
-    throw contractError
-  }
-
-  // Update or create vendor contact
-  if (input.vendorContact && input.vendorEmail) {
-    // Check if contact exists
-    const { data: existingContact } = await supabase
-      .from('vendor_contacts')
-      .select('id')
-      .eq('contract_id', id)
-      .single()
-
-    if (existingContact) {
-      await supabase
-        .from('vendor_contacts')
-        .update({
-          contact_name: input.vendorContact,
-          email: input.vendorEmail
-        })
-        .eq('contract_id', id)
-    } else {
-      await supabase
-        .from('vendor_contacts')
-        .insert({
-          contract_id: id,
-          contact_name: input.vendorContact,
-          email: input.vendorEmail
-        })
+  const { data: updatedContractId, error: contractError } = await supabase.rpc(
+    'update_contract_with_relations',
+    {
+      p_contract_id: id,
+      p_name: normalized.name,
+      p_vendor: normalized.vendor,
+      p_type: normalized.type,
+      p_start_date: normalized.startDate,
+      p_end_date: normalized.endDate,
+      p_value: normalized.value,
+      p_currency: normalized.currency,
+      p_auto_renew: normalized.autoRenew,
+      p_renewal_terms: normalized.renewalTerms,
+      p_notes: normalized.notes,
+      p_tags: normalized.tags,
+      p_vendor_contact: normalized.vendorContact,
+      p_vendor_email: normalized.vendorEmail,
+      p_reminder_days: normalized.reminderDays,
+      p_email_reminders: normalized.emailReminders,
+      p_notify_emails: normalized.notifyEmails,
     }
+  )
+
+  if (contractError || !updatedContractId) {
+    logContractsDbError('Error updating contract', contractError)
+    throw new Error(contractError?.message || 'Failed to update contract')
   }
 
-  // Update or create reminders
-  if (input.reminderDays) {
-    // Delete all existing reminders for this contract
-    await supabase
-      .from('reminders')
-      .delete()
-      .eq('contract_id', id)
-
-    // Create new reminder rows (one per day)
-    if (input.reminderDays.length > 0) {
-      await supabase
-        .from('reminders')
-        .insert(
-          input.reminderDays.map(days => ({
-            contract_id: id,
-            days_before: days,
-            notify_emails: input.notifyEmails || []
-          }))
-        )
-    }
-  }
-
-  const updatedContract = await getContractById(id)
+  const updatedContract = await getContractById(updatedContractId, userId)
   if (!updatedContract) {
     throw new Error('Failed to fetch updated contract')
+  }
+
+  if (userId) {
+    invalidateContractsPageCache(userId)
   }
 
   return updatedContract
 }
 
 // Delete contract - RLS ensures user can only delete their own contracts
-export async function deleteContract(id: string): Promise<void> {
+export async function deleteContract(id: string, userId: string): Promise<boolean> {
   const supabase = await getSupabase()
 
   // RLS ensures user can only delete their own contracts
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('contracts')
     .delete()
     .eq('id', id)
+    .eq('user_id', userId)
+    .select('id')
+    .maybeSingle()
 
   if (error) {
-    console.error('Error deleting contract:', error)
+    logContractsDbError('Error deleting contract', error)
     throw error
   }
+
+  if (data?.id) {
+    invalidateContractsPageCache(userId)
+  }
+
+  return Boolean(data?.id)
 }
 
 // Search contracts - with escaped wildcards to prevent SQL injection
@@ -479,7 +638,7 @@ export async function searchContracts(userId: string, query: string): Promise<Co
     .order('end_date', { ascending: true })
 
   if (error) {
-    console.error('Error searching contracts:', error)
+    logContractsDbError('Error searching contracts', error)
     throw error
   }
 
@@ -519,15 +678,15 @@ export async function getContractsByStatus(
   // Apply status-specific filters
   switch (status) {
     case 'critical':
-      query = query.lte('end_date', toUTCDateOnly(sevenDaysLater))
+      query = query.lte('end_date', toDateOnlyString(sevenDaysLater))
       break
     case 'expiring':
       query = query
-        .gt('end_date', toUTCDateOnly(sevenDaysLater))
-        .lte('end_date', toUTCDateOnly(thirtyDaysLater))
+        .gt('end_date', toDateOnlyString(sevenDaysLater))
+        .lte('end_date', toDateOnlyString(thirtyDaysLater))
       break
     case 'active':
-      query = query.gt('end_date', toUTCDateOnly(thirtyDaysLater))
+      query = query.gt('end_date', toDateOnlyString(thirtyDaysLater))
       break
     case 'renewing':
       query = query.eq('auto_renew', true)
@@ -537,7 +696,7 @@ export async function getContractsByStatus(
   const { data: contracts, error } = await query.order('end_date', { ascending: true })
 
   if (error) {
-    console.error('Error fetching contracts by status:', error)
+    logContractsDbError('Error fetching contracts by status', error)
     throw error
   }
 
@@ -569,12 +728,12 @@ export async function getUpcomingExpiries(userId: string): Promise<ContractWithD
       )
     `)
     .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .gte('end_date', today.toISOString().split('T')[0])
-    .lte('end_date', sixtyDaysLater.toISOString().split('T')[0])
+    .gte('end_date', toDateOnlyString(today))
+    .lte('end_date', toDateOnlyString(sixtyDaysLater))
     .order('end_date', { ascending: true })
 
   if (error) {
-    console.error('Error fetching upcoming expiries:', error)
+    logContractsDbError('Error fetching upcoming expiries', error)
     throw error
   }
 
@@ -586,111 +745,24 @@ export async function searchContractsPaginated(
   userId: string,
   query: string,
   page: number = 1,
-  pageSize: number = 20
-): Promise<{ contracts: ContractWithDetails[]; total: number }> {
-  const supabase = await getSupabase()
-  
-  // Auth check required - RLS will filter by user_id
-  // The userId parameter ensures we only search this user's contracts
-  
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  
-  // Escape ILIKE wildcards (%) and (_) to prevent unintended search results
-  const escapedQuery = query.replace(/[%_]/g, '\\$&')
-  
-  // Get count (filtered by user_id via RLS)
-  const { count } = await supabase
-    .from('contracts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .or(`name.ilike.%${escapedQuery}%,vendor.ilike.%${escapedQuery}%`)
-  
-  // Get paginated data (filtered by user_id via RLS)
-  const { data: contracts, error } = await supabase
-    .from('contracts')
-    .select(`
-      *,
-      vendor_contacts (
-        contact_name,
-        email
-      ),
-      reminders (
-        days_before,
-        notify_emails
-      )
-    `)
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .or(`name.ilike.%${escapedQuery}%,vendor.ilike.%${escapedQuery}%`)
-    .order('end_date', { ascending: true })
-    .range(from, to)
-  
-  if (error) {
-    console.error('Error searching contracts:', error)
-    throw error
-  }
-  
-  return {
-    contracts: contracts.map(transformContract),
-    total: count || 0
-  }
+  pageSize: number = 20,
+  countMode: ContractsCountMode = 'planned'
+): Promise<{ contracts: ContractWithDetails[]; total: number; timings: ContractsQueryTimings }> {
+  return fetchContractsPage(userId, page, pageSize, countMode, {
+    search: query,
+  })
 }
 
 // Get upcoming expiries with pagination (requires authenticated user)
 export async function getUpcomingExpiriesPaginated(
   userId: string,
   page: number = 1,
-  pageSize: number = 20
-): Promise<{ contracts: ContractWithDetails[]; total: number }> {
-  const supabase = await getSupabase()
-  
-  // Auth check required - RLS will filter by user_id
-  // The userId parameter ensures we only fetch this user's contracts
-  
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
-  
-  // Calculate date thresholds (timezone-safe)
-  const today = new Date()
-  const sixtyDaysLater = new Date(today.getTime() + (60 * 24 * 60 * 60 * 1000))
-  
-  // Get count (filtered by user_id via RLS)
-  const { count } = await supabase
-    .from('contracts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .gte('end_date', toUTCDateOnly(today))
-    .lte('end_date', toUTCDateOnly(sixtyDaysLater))
-
-  // Get paginated data (filtered by user_id via RLS)
-  const { data: contracts, error } = await supabase
-    .from('contracts')
-    .select(`
-      *,
-      vendor_contacts (
-        contact_name,
-        email
-      ),
-      reminders (
-        days_before,
-        notify_emails
-      )
-    `)
-    .eq('user_id', userId) // RLS ensures this user only sees their contracts
-    .gte('end_date', toUTCDateOnly(today))
-    .lte('end_date', toUTCDateOnly(sixtyDaysLater))
-    .order('end_date', { ascending: true })
-    .range(from, to)
-
-  if (error) {
-    console.error('Error fetching upcoming expiries:', error)
-    throw error
-  }
-
-  return {
-    contracts: contracts?.map(transformContract) || [],
-    total: count || 0
-  }
+  pageSize: number = 20,
+  countMode: ContractsCountMode = 'planned'
+): Promise<{ contracts: ContractWithDetails[]; total: number; timings: ContractsQueryTimings }> {
+  return fetchContractsPage(userId, page, pageSize, countMode, {
+    upcoming: true,
+  })
 }
 
 // Get contract statistics - calculate from contracts table (MVP simplicity)
@@ -714,7 +786,7 @@ export async function getContractStats(userId: string): Promise<{
     .eq('user_id', userId) // RLS ensures this user only sees their contracts
   
   if (error) {
-    console.error('Error fetching contract stats:', error)
+    logContractsDbError('Error fetching contract stats', error)
     throw error
   }
   

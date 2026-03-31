@@ -1,6 +1,33 @@
 import { SendEmailResult, EmailLogEntry } from '@/types/email';
 import type { CreateEmailOptions } from 'resend';
 
+function countRecipients(value: CreateEmailOptions['to']): number {
+  if (Array.isArray(value)) {
+    return value.length
+  }
+
+  return value ? 1 : 0
+}
+
+function summarizeEmailResult(result?: SendEmailResult): Record<string, unknown> | undefined {
+  if (!result) {
+    return undefined
+  }
+
+  const rawId =
+    result.data && typeof result.data === 'object' && 'id' in result.data
+      ? (result.data as { id?: unknown }).id
+      : undefined
+
+  return {
+    success: result.success,
+    statusCode: result.statusCode,
+    retryAfterSeconds: result.retryAfterSeconds,
+    emailId: typeof rawId === 'string' ? rawId : undefined,
+    error: result.success ? undefined : result.error,
+  }
+}
+
 /**
  * Log email event to console
  * In production, you might want to send this to a logging service
@@ -22,9 +49,9 @@ export function logEmailEvent(event: {
 
   // Log to console (in production, send to logging service)
   console.log(`[Email ${event.type.toUpperCase()}]`, {
-    to: event.emailData.to,
-    subject: event.emailData.subject,
-    result: event.result,
+    recipientCount: countRecipients(event.emailData.to),
+    hasSubject: Boolean(event.emailData.subject),
+    result: summarizeEmailResult(event.result),
     timestamp: logEntry.timestamp,
     ...event.metadata,
   });

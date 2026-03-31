@@ -1,7 +1,81 @@
-import { resend } from '@/lib/resend';
+import { getResendClient } from '@/lib/resend';
 import { logEmailEvent } from './email-logger';
 import { SendEmailResult } from '@/types/email';
-import type { CreateEmailOptions } from 'resend';
+import type {
+  CreateBatchRequestOptions,
+  CreateEmailOptions,
+  CreateEmailRequestOptions,
+} from 'resend';
+
+function parseRetryAfterSeconds(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === 'string') {
+    const numeric = Number.parseInt(value, 10);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return numeric;
+    }
+
+    const parsedDate = Date.parse(value);
+    if (!Number.isNaN(parsedDate)) {
+      const seconds = Math.ceil((parsedDate - Date.now()) / 1000);
+      return seconds > 0 ? seconds : undefined;
+    }
+  }
+
+  return undefined;
+}
+
+function extractRetryAfterSeconds(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const typed = error as {
+    retryAfter?: unknown;
+    retry_after?: unknown;
+    headers?: unknown;
+  };
+
+  const explicitRetryAfter =
+    parseRetryAfterSeconds(typed.retryAfter) ||
+    parseRetryAfterSeconds(typed.retry_after);
+  if (explicitRetryAfter) {
+    return explicitRetryAfter;
+  }
+
+  const headers = typed.headers as
+    | { get?: (name: string) => string | null; ['retry-after']?: unknown; retryAfter?: unknown }
+    | undefined;
+
+  if (!headers) {
+    return undefined;
+  }
+
+  return (
+    parseRetryAfterSeconds(headers.get?.('retry-after') ?? undefined) ||
+    parseRetryAfterSeconds(headers['retry-after']) ||
+    parseRetryAfterSeconds(headers.retryAfter)
+  );
+}
+
+function computeRetryDelayMs(attempt: number, retryAfterSeconds?: number): number {
+  const exponentialMs = Math.min(6_000, Math.pow(2, attempt) * 400);
+  const jitterMs = Math.floor(Math.random() * 200);
+  const hintedMs = retryAfterSeconds ? retryAfterSeconds * 1000 : 0;
+  return Math.max(exponentialMs + jitterMs, hintedMs);
+}
+
+function shouldRetryStatusCode(statusCode?: number): boolean {
+  if (!Number.isFinite(statusCode)) {
+    return false;
+  }
+
+  const normalized = Number(statusCode);
+  return normalized === 408 || normalized === 429 || normalized >= 500;
+}
 
 /**
  * EmailService class for handling all email operations
@@ -11,7 +85,7 @@ export class EmailService {
   private maxRetries: number;
   private enableLogging: boolean;
 
-  constructor(maxRetries: number = 3, enableLogging: boolean = true) {
+  constructor(maxRetries: number = 2, enableLogging: boolean = true) {
     this.maxRetries = maxRetries;
     this.enableLogging = enableLogging;
   }
@@ -21,15 +95,21 @@ export class EmailService {
    * @param {CreateEmailOptions} data - Email data to send
    * @returns {Promise<SendEmailResult>} Send result with success status
    */
-  async sendEmail(data: CreateEmailOptions): Promise<SendEmailResult> {
+  async sendEmail(
+    data: CreateEmailOptions,
+    options?: CreateEmailRequestOptions
+  ): Promise<SendEmailResult> {
     try {
-      const { data: result, error } = await resend.emails.send(data);
+      const resend = getResendClient();
+      const { data: result, error } = await resend.emails.send(data, options);
 
       if (error) {
+        const retryAfterSeconds = extractRetryAfterSeconds(error);
         const errorResult: SendEmailResult = {
           success: false,
           error: error.message,
           statusCode: error.statusCode || undefined,
+          retryAfterSeconds,
         };
 
         if (this.enableLogging) {
@@ -64,6 +144,7 @@ export class EmailService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         statusCode: 500,
+        retryAfterSeconds: extractRetryAfterSeconds(error),
       };
 
       if (this.enableLogging) {
@@ -84,15 +165,21 @@ export class EmailService {
    * @param {CreateEmailOptions[]} emails - Array of email data to send
    * @returns {Promise<SendEmailResult>} Send result with success status
    */
-  async sendBatch(emails: CreateEmailOptions[]): Promise<SendEmailResult> {
+  async sendBatch(
+    emails: CreateEmailOptions[],
+    options?: CreateBatchRequestOptions
+  ): Promise<SendEmailResult> {
     try {
-      const { data, error } = await resend.batch.send(emails);
+      const resend = getResendClient();
+      const { data, error } = await resend.batch.send(emails, options);
 
       if (error) {
+        const retryAfterSeconds = extractRetryAfterSeconds(error);
         const errorResult: SendEmailResult = {
           success: false,
           error: error.message,
           statusCode: error.statusCode || undefined,
+          retryAfterSeconds,
         };
 
         if (this.enableLogging) {
@@ -135,6 +222,7 @@ export class EmailService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         statusCode: 500,
+        retryAfterSeconds: extractRetryAfterSeconds(error),
       };
 
       if (this.enableLogging) {
@@ -163,18 +251,19 @@ export class EmailService {
    */
   async sendWithRetry(
     data: CreateEmailOptions,
-    maxRetries: number = this.maxRetries
+    maxRetries: number = this.maxRetries,
+    options?: CreateEmailRequestOptions
   ): Promise<SendEmailResult> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const result = await this.sendEmail(data);
+      const result = await this.sendEmail(data, options);
 
       if (result.success) {
         return result;
       }
 
-      // Retry on rate limit (429)
-      if (result.statusCode === 429 && attempt < maxRetries - 1) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+      // Retry only transient failures (408/429/5xx) with bounded backoff.
+      if (shouldRetryStatusCode(result.statusCode) && attempt < maxRetries - 1) {
+        const delay = computeRetryDelayMs(attempt, result.retryAfterSeconds);
         
         if (this.enableLogging) {
           logEmailEvent({
@@ -213,18 +302,19 @@ export class EmailService {
    */
   async sendBatchWithRetry(
     emails: CreateEmailOptions[],
-    maxRetries: number = this.maxRetries
+    maxRetries: number = this.maxRetries,
+    options?: CreateBatchRequestOptions
   ): Promise<SendEmailResult> {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
-      const result = await this.sendBatch(emails);
+      const result = await this.sendBatch(emails, options);
 
       if (result.success) {
         return result;
       }
 
-      // Retry on rate limit (429)
-      if (result.statusCode === 429 && attempt < maxRetries - 1) {
-        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+      // Retry only transient failures (408/429/5xx) with bounded backoff.
+      if (shouldRetryStatusCode(result.statusCode) && attempt < maxRetries - 1) {
+        const delay = computeRetryDelayMs(attempt, result.retryAfterSeconds);
         
         if (this.enableLogging) {
           logEmailEvent({

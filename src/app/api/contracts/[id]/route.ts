@@ -2,8 +2,79 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateSession } from '@/lib/supabase/server'
 import { getContractById, updateContract, deleteContract } from '@/lib/db/contracts'
 import { validateOrigin, getOriginErrorResponse, logInvalidOriginAttempt } from '@/lib/security/csrf'
+import {
+  checkRateLimit,
+  getRateLimitHeaders,
+  getRequestIp,
+  type RateLimitOptions,
+  type RateLimitResult,
+} from '@/lib/security/rate-limit'
 import { validateContractInput } from '@/lib/validation/contract-schema'
-import { updateTag } from 'next/cache'
+
+const CONTRACT_DETAIL_RATE_LIMIT: RateLimitOptions = {
+  limit: 120,
+  windowMs: 60_000,
+}
+const CONTRACT_MUTATION_RATE_LIMIT: RateLimitOptions = {
+  limit: 40,
+  windowMs: 60_000,
+}
+
+function getContractsRateLimitedResponse(
+  rateResult: RateLimitResult,
+  options: RateLimitOptions
+): NextResponse {
+  const retryAfterSeconds = Math.max(1, Math.min(300, Math.trunc(rateResult.retryAfterSeconds || 30)))
+  return NextResponse.json(
+    {
+      success: false,
+      code: 'CONTRACTS_RATE_LIMITED',
+      error: 'Too many requests. Please try again shortly.',
+      retryAfterSeconds,
+    },
+    {
+      status: 429,
+      headers: getRateLimitHeaders(
+        {
+          allowed: false,
+          remaining: Math.max(0, Math.trunc(rateResult.remaining || 0)),
+          retryAfterSeconds,
+        },
+        options
+      ),
+    }
+  )
+}
+
+function mapContractUpdateError(error: unknown): {
+  status: number
+  code: string
+  message: string
+} {
+  const message = error instanceof Error ? error.message : ''
+
+  if (message.includes('Contract not found or access denied')) {
+    return {
+      status: 404,
+      code: 'CONTRACT_NOT_FOUND',
+      message: 'Contract not found or access denied',
+    }
+  }
+
+  if (message.includes('Email reminders require an active premium subscription')) {
+    return {
+      status: 403,
+      code: 'FEATURE_REQUIRES_PREMIUM',
+      message: 'Email reminders require an active premium subscription.',
+    }
+  }
+
+  return {
+    status: 500,
+    code: 'CONTRACT_UPDATE_FAILED',
+    message: 'Failed to update contract. Please try again.',
+  }
+}
 
 /**
  * GET /api/contracts/[id] - Fetch single contract
@@ -18,6 +89,12 @@ export async function GET(
       logInvalidOriginAttempt(request, 'GET /api/contracts/[id]')
       return getOriginErrorResponse()
     }
+
+    const ip = getRequestIp(request)
+    const ipRate = await checkRateLimit(`contract-detail:ip:${ip}`, CONTRACT_DETAIL_RATE_LIMIT)
+    if (!ipRate.allowed) {
+      return getContractsRateLimitedResponse(ipRate, CONTRACT_DETAIL_RATE_LIMIT)
+    }
     
     // Validate session using enhanced validation
     const { user, error: sessionError } = await validateSession()
@@ -25,7 +102,7 @@ export async function GET(
     if (sessionError) {
       console.error('[GET /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.', details: sessionError },
+        { success: false, error: 'Authentication error. Please sign in again.' },
         { status: 401 }
       )
     }
@@ -35,6 +112,11 @@ export async function GET(
         { success: false, error: 'Unauthorized - please sign in' },
         { status: 401 }
       )
+    }
+
+    const userRate = await checkRateLimit(`contract-detail:user:${user.id}`, CONTRACT_DETAIL_RATE_LIMIT)
+    if (!userRate.allowed) {
+      return getContractsRateLimitedResponse(userRate, CONTRACT_DETAIL_RATE_LIMIT)
     }
     
     const { id } = await params
@@ -57,7 +139,17 @@ export async function GET(
       )
     }
     
-    return NextResponse.json({ success: true, data: contract })
+    return NextResponse.json(
+      { success: true, data: contract },
+      {
+        headers: {
+          'Cache-Control': 'private, no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          ...getRateLimitHeaders(userRate, CONTRACT_DETAIL_RATE_LIMIT),
+        },
+      }
+    )
   } catch (error) {
     console.error('[GET /api/contracts/[id]] Unexpected error:', error)
     return NextResponse.json(
@@ -80,6 +172,12 @@ export async function PATCH(
       logInvalidOriginAttempt(request, 'PATCH /api/contracts/[id]')
       return getOriginErrorResponse()
     }
+
+    const ip = getRequestIp(request)
+    const ipRate = await checkRateLimit(`contracts-mutate:ip:${ip}`, CONTRACT_MUTATION_RATE_LIMIT)
+    if (!ipRate.allowed) {
+      return getContractsRateLimitedResponse(ipRate, CONTRACT_MUTATION_RATE_LIMIT)
+    }
     
     // Validate session using enhanced validation
     const { user, error: sessionError } = await validateSession()
@@ -87,7 +185,7 @@ export async function PATCH(
     if (sessionError) {
       console.error('[PATCH /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.', details: sessionError },
+        { success: false, error: 'Authentication error. Please sign in again.' },
         { status: 401 }
       )
     }
@@ -99,27 +197,13 @@ export async function PATCH(
       )
     }
 
+    const userRate = await checkRateLimit(`contracts-mutate:user:${user.id}`, CONTRACT_MUTATION_RATE_LIMIT)
+    if (!userRate.allowed) {
+      return getContractsRateLimitedResponse(userRate, CONTRACT_MUTATION_RATE_LIMIT)
+    }
+
     const { id } = await params
     const body = await request.json()
-    
-    // Check ownership before updating
-    let existingContract
-    try {
-      existingContract = await getContractById(id, user.id)
-    } catch (dbError) {
-      console.error('[PATCH /api/contracts/[id]] Database error (fetch):', dbError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to verify contract ownership' },
-        { status: 500 }
-      )
-    }
-    
-    if (!existingContract) {
-      return NextResponse.json(
-        { success: false, error: 'Contract not found or access denied' },
-        { status: 404 }
-      )
-    }
     
     // Validate with Zod schema
     const validationResult = validateContractInput(body)
@@ -155,17 +239,19 @@ export async function PATCH(
         reminderDays: data.reminderDays,
         emailReminders: data.emailReminders,
         notifyEmails: data.notifyEmails
-      })
+      }, user.id)
     } catch (dbError) {
       console.error('[PATCH /api/contracts/[id]] Database error (update):', dbError)
+      const mappedError = mapContractUpdateError(dbError)
       return NextResponse.json(
-        { success: false, error: 'Failed to update contract in database' },
-        { status: 500 }
+        {
+          success: false,
+          error: mappedError.message,
+          code: mappedError.code,
+        },
+        { status: mappedError.status }
       )
     }
-
-    // Invalidate cache
-    updateTag(`user-${user.id}`)
 
     if (!contract) {
       return NextResponse.json(
@@ -174,7 +260,12 @@ export async function PATCH(
       )
     }
 
-    return NextResponse.json({ success: true, data: contract })
+    return NextResponse.json(
+      { success: true, data: contract },
+      {
+        headers: getRateLimitHeaders(userRate, CONTRACT_MUTATION_RATE_LIMIT),
+      }
+    )
   } catch (error) {
     console.error('[PATCH /api/contracts/[id]] Unexpected error:', error)
     return NextResponse.json(
@@ -197,6 +288,12 @@ export async function DELETE(
       logInvalidOriginAttempt(request, 'DELETE /api/contracts/[id]')
       return getOriginErrorResponse()
     }
+
+    const ip = getRequestIp(request)
+    const ipRate = await checkRateLimit(`contracts-mutate:ip:${ip}`, CONTRACT_MUTATION_RATE_LIMIT)
+    if (!ipRate.allowed) {
+      return getContractsRateLimitedResponse(ipRate, CONTRACT_MUTATION_RATE_LIMIT)
+    }
     
     // Validate session using enhanced validation
     const { user, error: sessionError } = await validateSession()
@@ -204,7 +301,7 @@ export async function DELETE(
     if (sessionError) {
       console.error('[DELETE /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.', details: sessionError },
+        { success: false, error: 'Authentication error. Please sign in again.' },
         { status: 401 }
       )
     }
@@ -216,29 +313,16 @@ export async function DELETE(
       )
     }
 
+    const userRate = await checkRateLimit(`contracts-mutate:user:${user.id}`, CONTRACT_MUTATION_RATE_LIMIT)
+    if (!userRate.allowed) {
+      return getContractsRateLimitedResponse(userRate, CONTRACT_MUTATION_RATE_LIMIT)
+    }
+
     const { id } = await params
     
-    // Check ownership before deleting
-    let existingContract
+    let deleted = false
     try {
-      existingContract = await getContractById(id, user.id)
-    } catch (dbError) {
-      console.error('[DELETE /api/contracts/[id]] Database error (fetch):', dbError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to verify contract ownership' },
-        { status: 500 }
-      )
-    }
-    
-    if (!existingContract) {
-      return NextResponse.json(
-        { success: false, error: 'Contract not found or access denied' },
-        { status: 404 }
-      )
-    }
-    
-    try {
-      await deleteContract(id)
+      deleted = await deleteContract(id, user.id)
     } catch (dbError) {
       console.error('[DELETE /api/contracts/[id]] Database error (delete):', dbError)
       return NextResponse.json(
@@ -247,10 +331,19 @@ export async function DELETE(
       )
     }
 
-    // Invalidate cache
-    updateTag(`user-${user.id}`)
+    if (!deleted) {
+      return NextResponse.json(
+        { success: false, error: 'Contract not found or access denied' },
+        { status: 404 }
+      )
+    }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(
+      { success: true },
+      {
+        headers: getRateLimitHeaders(userRate, CONTRACT_MUTATION_RATE_LIMIT),
+      }
+    )
   } catch (error) {
     console.error('[DELETE /api/contracts/[id]] Unexpected error:', error)
     return NextResponse.json(

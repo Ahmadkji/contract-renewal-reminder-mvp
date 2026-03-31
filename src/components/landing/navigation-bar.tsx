@@ -9,7 +9,6 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/components/auth";
 import { ANIMATION_DELAY_MS } from "@/lib/constants";
 
 interface NavLink {
@@ -25,7 +24,6 @@ const NAV_LINKS: NavLink[] = [
 ];
 
 export function NavigationBar() {
-  const { openAuth } = useAuth();
   const [isVisible, setIsVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
@@ -133,19 +131,19 @@ export function NavigationBar() {
         <div className="flex items-center gap-3">
           {/* Sign In Button (Desktop) */}
           <Button
+            asChild
             variant="ghost"
             className="hidden md:flex text-slate-300 hover:text-slate-100 hover:bg-slate-800/50"
-            onClick={() => openAuth('login')}
           >
-            Sign In
+            <Link href="/login">Sign In</Link>
           </Button>
           
           {/* Get Started Button (Desktop) */}
           <Button
+            asChild
             className="hidden md:flex bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold"
-            onClick={() => openAuth('signup')}
           >
-            Get Started
+            <Link href="/signup">Get Started</Link>
           </Button>
           
           {/* Search Icon (Desktop) */}
@@ -189,23 +187,27 @@ export function NavigationBar() {
             {/* Mobile Auth Buttons */}
             <div className="flex flex-col gap-4 w-full max-w-xs mt-4">
               <Button
+                asChild
                 variant="outline"
                 className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"
-                onClick={() => {
-                  setMobileMenuOpen(false)
-                  openAuth('login')
-                }}
               >
-                Sign In
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
               </Button>
               <Button
+                asChild
                 className="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold"
-                onClick={() => {
-                  setMobileMenuOpen(false)
-                  openAuth('signup')
-                }}
               >
-                Get Started
+                <Link
+                  href="/signup"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started
+                </Link>
               </Button>
             </div>
           </div>

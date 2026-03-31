@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useTransition, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useTransition, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { login } from '@/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -10,16 +10,64 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowRight, FileText, Bell, Clock, Shield, Zap } from 'lucide-react'
 
+function sanitizeRedirectPath(redirect: string | null): string {
+  if (!redirect) return '/dashboard'
+  if (!redirect.startsWith('/')) return '/dashboard'
+  if (redirect.startsWith('//')) return '/dashboard'
+  return redirect
+}
+
+function normalizeRetryAfterSeconds(value: unknown, fallback: number = 30): number {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : NaN
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.max(1, Math.min(300, Math.trunc(parsed)))
+}
+
 function LoginForm() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [formError, setFormError] = useState<string>('')
+  const [loginCooldownUntilMs, setLoginCooldownUntilMs] = useState(0)
+  const [loginCooldownNowMs, setLoginCooldownNowMs] = useState(0)
   
-  const redirect = searchParams.get('redirect') || '/dashboard'
+  const redirect = sanitizeRedirectPath(searchParams.get('redirect'))
+
+  useEffect(() => {
+    if (loginCooldownUntilMs <= Date.now()) {
+      return
+    }
+
+    const timer = setInterval(() => {
+      setLoginCooldownNowMs(Date.now())
+      if (Date.now() >= loginCooldownUntilMs) {
+        clearInterval(timer)
+      }
+    }, 250)
+
+    return () => clearInterval(timer)
+  }, [loginCooldownUntilMs])
+
+  const loginCooldownSeconds =
+    loginCooldownUntilMs > loginCooldownNowMs
+      ? Math.max(0, Math.ceil((loginCooldownUntilMs - loginCooldownNowMs) / 1000))
+      : 0
   
   const handleSubmit = async (formData: FormData) => {
+    if (loginCooldownSeconds > 0) {
+      setFormError(`Too many attempts. Try again in ${loginCooldownSeconds}s.`)
+      return
+    }
+
     setErrors({})
     setFormError('')
     
@@ -32,6 +80,14 @@ function LoginForm() {
         }
         if (result.error) {
           setFormError(result.error)
+        }
+
+        if (result.code === 'RATE_LIMITED') {
+          const retryAfterSeconds = normalizeRetryAfterSeconds(result.retryAfterSeconds, 30)
+          const now = Date.now()
+          setLoginCooldownNowMs(now)
+          setLoginCooldownUntilMs(now + retryAfterSeconds * 1000)
+          setFormError(result.error || `Too many attempts. Try again in ${retryAfterSeconds}s.`)
         }
       } else {
         // Success - navigate to dashboard with full page reload
@@ -152,7 +208,7 @@ function LoginForm() {
                 type="email"
                 placeholder="you@example.com"
                 autoComplete="email"
-                disabled={isPending}
+                disabled={isPending || loginCooldownSeconds > 0}
                 className="h-12 bg-[#0f0f0f] border border-white/10 text-white placeholder:text-slate-500 focus:border-white focus:ring-white/20"
               />
               {errors.email && (
@@ -176,7 +232,7 @@ function LoginForm() {
                 type="password"
                 placeholder="••••••••••"
                 autoComplete="current-password"
-                disabled={isPending}
+                disabled={isPending || loginCooldownSeconds > 0}
                 className="h-12 bg-[#0f0f0f] border border-white/10 text-white placeholder:text-slate-500 focus:border-white focus:ring-white/20"
               />
               {errors.password && (
@@ -187,13 +243,15 @@ function LoginForm() {
             <Button 
               type="submit" 
               className="w-full h-12 bg-white hover:bg-slate-200 text-black font-semibold transition-all duration-200"
-              disabled={isPending}
+              disabled={isPending || loginCooldownSeconds > 0}
             >
               {isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
                 </>
+              ) : loginCooldownSeconds > 0 ? (
+                <>Try again in {loginCooldownSeconds}s</>
               ) : (
                 <>
                   Sign in

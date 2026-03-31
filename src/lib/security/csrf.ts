@@ -24,16 +24,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { env } from '@/lib/env'
+import { serverEnv as env } from '@/lib/env/server'
 
-/**
- * Allowed origins for your application
- * Include all production, staging, and development URLs
- */
-const ALLOWED_ORIGINS = [
-  // Primary app URL (may be undefined in some setups)
-  ...(env.NEXT_PUBLIC_APP_URL ? [env.NEXT_PUBLIC_APP_URL] : []),
-  // Localhost variants for development
+const LOCAL_DEV_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
@@ -46,10 +39,55 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:3003',
   'http://127.0.0.1:3004',
   'http://127.0.0.1:3005',
-  // Add your production URLs here
-  // 'https://yourapp.com',
-  // 'https://www.yourapp.com',
 ]
+
+function normalizeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function parseConfiguredOrigins(value: string | undefined): string[] {
+  if (!value) {
+    return []
+  }
+
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
+
+function buildAllowedOrigins(): Set<string> {
+  const allowedOrigins = new Set<string>()
+  const configuredOrigins = parseConfiguredOrigins(env.CSRF_TRUSTED_ORIGINS)
+
+  for (const origin of [env.NEXT_PUBLIC_APP_URL, ...configuredOrigins]) {
+    if (!origin) {
+      continue
+    }
+
+    const normalized = normalizeOrigin(origin)
+    if (normalized) {
+      allowedOrigins.add(normalized)
+    }
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    for (const localOrigin of LOCAL_DEV_ORIGINS) {
+      const normalized = normalizeOrigin(localOrigin)
+      if (normalized) {
+        allowedOrigins.add(normalized)
+      }
+    }
+  }
+
+  return allowedOrigins
+}
+
+const ALLOWED_ORIGINS = buildAllowedOrigins()
 
 /**
  * Validate Origin header to prevent CSRF attacks
@@ -76,33 +114,22 @@ const ALLOWED_ORIGINS = [
  * ```
  */
 export function validateOrigin(request: NextRequest): boolean {
-  const origin = request.headers.get('origin')
-  const host = request.headers.get('host')
+  const origin = request.headers.get('origin')?.trim()
+  const method = request.method.toUpperCase()
 
   // Allow same-origin requests (no Origin header)
-  // Browsers don't send Origin header for same-origin requests
+  // For unsafe methods, require Origin to be present and valid.
   if (!origin) {
-    return true
+    return method === 'GET' || method === 'HEAD' || method === 'OPTIONS'
+  }
+
+  const normalizedOrigin = normalizeOrigin(origin)
+  if (!normalizedOrigin) {
+    return false
   }
 
   // Validate Origin header against allowed origins
-  const isAllowed = ALLOWED_ORIGINS.some(allowedOrigin => {
-    try {
-      // Parse both URLs for comparison
-      const allowedUrl = new URL(allowedOrigin)
-      const originUrl = new URL(origin)
-
-      // Compare protocol and hostname
-      return (
-        allowedUrl.protocol === originUrl.protocol &&
-        allowedUrl.hostname === originUrl.hostname &&
-        allowedUrl.port === originUrl.port
-      )
-    } catch {
-      // Invalid URL format
-      return false
-    }
-  })
+  const isAllowed = ALLOWED_ORIGINS.has(normalizedOrigin)
 
   return isAllowed
 }

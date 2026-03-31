@@ -1,18 +1,193 @@
 'use server'
 
-import { redirect } from 'next/navigation'
+import { createHash } from 'node:crypto'
 import { 
   signupSchema, 
   loginSchema, 
   forgotPasswordSchema, 
-  resetPasswordSchema
+  resetPasswordSchema,
+  profileUpdateSchema,
 } from '@/lib/validation/auth-schema'
-import { createClient, validateSession } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { mapSupabaseError, formatZodErrors, AuthError } from '@/lib/errors/auth-errors'
-import { env } from '@/lib/env'
+import { serverEnv as env } from '@/lib/env/server'
 import { updateProfile } from '@/lib/db/profiles'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { serializeUser } from '@/lib/serializers/user'
+import { checkRateLimit, type RateLimitOptions } from '@/lib/security/rate-limit'
+import { logger } from '@/lib/logger'
+
+const LOGIN_IP_RATE_LIMIT: RateLimitOptions = {
+  limit: 5,
+  windowMs: 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+const LOGIN_EMAIL_RATE_LIMIT: RateLimitOptions = {
+  limit: 10,
+  windowMs: 15 * 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+const SIGNUP_IP_RATE_LIMIT: RateLimitOptions = {
+  limit: 3,
+  windowMs: 15 * 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+const SIGNUP_EMAIL_RATE_LIMIT: RateLimitOptions = {
+  limit: 5,
+  windowMs: 60 * 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+const FORGOT_PASSWORD_IP_RATE_LIMIT: RateLimitOptions = {
+  limit: 3,
+  windowMs: 15 * 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+const FORGOT_PASSWORD_EMAIL_RATE_LIMIT: RateLimitOptions = {
+  limit: 3,
+  windowMs: 15 * 60_000,
+  failClosedWhenUnhealthy: true,
+  failClosedRetryAfterSeconds: 60,
+}
+
+type RateLimitedAuthResult = {
+  success: false
+  error: string
+  code: 'RATE_LIMITED'
+  retryAfterSeconds: number
+  errors?: Record<string, string>
+}
+
+function normalizeRetryAfterSeconds(value: unknown, fallback: number = 30): number {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+        ? Number.parseInt(value, 10)
+        : NaN
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback
+  }
+
+  return Math.max(1, Math.min(300, Math.trunc(parsed)))
+}
+
+function buildRateLimitedAuthResult(
+  retryAfterSeconds: number,
+  message: string
+): RateLimitedAuthResult {
+  return {
+    success: false,
+    error: message,
+    code: 'RATE_LIMITED',
+    retryAfterSeconds: normalizeRetryAfterSeconds(retryAfterSeconds, 30),
+  }
+}
+
+function hashRateLimitValue(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 32)
+}
+
+function buildSafeErrorLogPayload(error: unknown): {
+  name?: string
+  message: string
+  code?: string
+  status?: number
+} {
+  if (error && typeof error === 'object') {
+    const candidate = error as {
+      name?: unknown
+      message?: unknown
+      code?: unknown
+      status?: unknown
+    }
+
+    return {
+      name: typeof candidate.name === 'string' ? candidate.name : undefined,
+      message:
+        typeof candidate.message === 'string' ? candidate.message : 'Unknown error',
+      code: typeof candidate.code === 'string' ? candidate.code : undefined,
+      status: typeof candidate.status === 'number' ? candidate.status : undefined,
+    }
+  }
+
+  return {
+    message: typeof error === 'string' ? error : 'Unknown error',
+  }
+}
+
+function logSanitizedAuthError(label: string, error: unknown): void {
+  console.error(label, buildSafeErrorLogPayload(error))
+}
+
+async function getRequestIpFromHeaders(): Promise<string> {
+  const headerStore = await headers()
+  const forwardedFor = headerStore.get('x-forwarded-for')
+
+  if (forwardedFor) {
+    return forwardedFor.split(',')[0]?.trim() || 'unknown'
+  }
+
+  const realIp = headerStore.get('x-real-ip')
+  if (realIp) {
+    return realIp.trim()
+  }
+
+  return 'unknown'
+}
+
+async function enforceRateLimit(
+  key: string,
+  options: RateLimitOptions,
+  message: string
+): Promise<RateLimitedAuthResult | null> {
+  const result = await checkRateLimit(key, options)
+
+  if (result.allowed) {
+    return null
+  }
+
+  return buildRateLimitedAuthResult(result.retryAfterSeconds, message)
+}
+
+async function enforceAuthRateLimits(params: {
+  action: 'login' | 'signup' | 'forgot-password'
+  email: string
+  ipOptions: RateLimitOptions
+  emailOptions: RateLimitOptions
+  message: string
+}): Promise<RateLimitedAuthResult | null> {
+  const ip = await getRequestIpFromHeaders()
+  const ipLimited = await enforceRateLimit(
+    `auth:${params.action}:ip:${ip}`,
+    params.ipOptions,
+    params.message
+  )
+
+  if (ipLimited) {
+    return ipLimited
+  }
+
+  const normalizedEmail = params.email.trim().toLowerCase()
+  const emailHash = hashRateLimitValue(normalizedEmail)
+
+  return enforceRateLimit(
+    `auth:${params.action}:email:${emailHash}`,
+    params.emailOptions,
+    params.message
+  )
+}
 
 /**
  * Signup action - Creates new user account with validation
@@ -31,6 +206,18 @@ export async function signup(formData: FormData) {
       success: false, 
       errors: formatZodErrors(validated.error.flatten().fieldErrors) 
     }
+  }
+
+  const signupRateLimit = await enforceAuthRateLimits({
+    action: 'signup',
+    email: validated.data.email,
+    ipOptions: SIGNUP_IP_RATE_LIMIT,
+    emailOptions: SIGNUP_EMAIL_RATE_LIMIT,
+    message: 'Too many signup attempts. Please try again later.',
+  })
+
+  if (signupRateLimit) {
+    return signupRateLimit
   }
   
   try {
@@ -55,13 +242,13 @@ export async function signup(formData: FormData) {
     if (data.user) {
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert({
+      .insert({
           user_id: data.user.id,
           full_name: validated.data.fullName || data.user.email?.split('@')[0]
         })
       
       if (profileError) {
-        console.error('Failed to create profile:', profileError)
+        logSanitizedAuthError('[Signup] Failed to create profile:', profileError)
         // Continue anyway - user can create profile later
       }
     }
@@ -69,10 +256,15 @@ export async function signup(formData: FormData) {
     return { success: true, message: 'Check your email to verify your account' }
   } catch (error) {
     if (error instanceof AuthError) {
+      const retryAfterSeconds =
+        error.code === 'RATE_LIMITED'
+          ? normalizeRetryAfterSeconds(error.retryAfterSeconds, 30)
+          : undefined
       return { 
         success: false, 
         error: error.message,
-        code: error.code 
+        code: error.code,
+        retryAfterSeconds,
       }
     }
     return { 
@@ -99,6 +291,18 @@ export async function login(formData: FormData) {
       errors: formatZodErrors(validated.error.flatten().fieldErrors) 
     }
   }
+
+  const loginRateLimit = await enforceAuthRateLimits({
+    action: 'login',
+    email: validated.data.email,
+    ipOptions: LOGIN_IP_RATE_LIMIT,
+    emailOptions: LOGIN_EMAIL_RATE_LIMIT,
+    message: 'Too many login attempts. Please try again later.',
+  })
+
+  if (loginRateLimit) {
+    return loginRateLimit
+  }
   
   try {
     // 2. Sign in with Supabase
@@ -109,53 +313,37 @@ export async function login(formData: FormData) {
     })
     
     if (error) {
-      // Enhanced debug logging to capture exact error
-      console.error('=== SUPABASE LOGIN ERROR ===')
-      console.error('Full error object:', JSON.stringify(error, null, 2))
-      console.error('Error message:', error.message)
-      console.error('Error status:', error.status)
-      console.error('Error code:', error.code)
-      console.error('Error name:', error.name)
-      console.error('Error type:', typeof error)
-      console.error('Error keys:', Object.keys(error || {}))
-      console.error('============================')
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[Login] Supabase login error:', {
+          message: error.message,
+          status: error.status,
+          code: error.code,
+        })
+      }
       throw mapSupabaseError(error)
     }
     
-    // 3. Verify session was created properly
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-    if (sessionError || !session) {
-      console.error('Session creation failed after login:', { sessionError, session })
-      throw new AuthError(
-        'Failed to establish session. Please try again.',
-        'SESSION_CREATION_FAILED',
-        500
-      )
-    }
-    
-    console.log('Login successful, session established for user:', session.user.id)
-    
-    // 4. Cookies are set in HTTP response headers by Supabase
-    // Cannot verify in same request - trust Supabase's session creation
-    // Cookies will be sent to browser after this function completes
-    
-    // 5. Return success with user data for client navigation
+    // 3. Cookies are set in response headers by Supabase. Avoid extra getSession()
+    // round-trips here to keep login path fast under burst load.
+
+    // 4. Return success with user data for client navigation
     return { 
       success: true, 
-      user: data.user,
-      session: {
-        accessToken: session.access_token,
-        expiresAt: session.expires_at
-      },
+      user: serializeUser(data.user),
       message: 'Login successful'
     }
   } catch (error) {
-    console.error('Login catch block error:', error)
+    logSanitizedAuthError('[Login] Unexpected error:', error)
     if (error instanceof AuthError) {
+      const retryAfterSeconds =
+        error.code === 'RATE_LIMITED'
+          ? normalizeRetryAfterSeconds(error.retryAfterSeconds, 30)
+          : undefined
       return { 
         success: false, 
         error: error.message,
-        code: error.code 
+        code: error.code,
+        retryAfterSeconds,
       }
     }
     return { 
@@ -169,14 +357,14 @@ export async function login(formData: FormData) {
  * Logout action - Signs out current user with verification
  * Verifies session is destroyed and clears all cached data
  */
-export async function logout(formData?: FormData) {
+export async function logout(_formData?: FormData) {
   const supabase = await createClient()
   
   // 1. Attempt sign out
   const { error: signOutError } = await supabase.auth.signOut()
   
   if (signOutError) {
-    console.error('[Logout] Sign out failed:', signOutError)
+    logSanitizedAuthError('[Logout] Sign out failed:', signOutError)
     return { 
       success: false, 
       error: 'Failed to logout. Please try again.' 
@@ -184,10 +372,12 @@ export async function logout(formData?: FormData) {
   }
   
   // 2. Verify session is destroyed
-  const { data: { user }, error: sessionError } = await supabase.auth.getUser()
+  const { data: { user }, error: _sessionError } = await supabase.auth.getUser()
   
   if (user) {
-    console.error('[Logout] Session still exists after logout:', user)
+    console.error('[Logout] Session still exists after logout:', {
+      userId: user.id,
+    })
     return { 
       success: false, 
       error: 'Failed to properly destroy session. Please try again.' 
@@ -210,7 +400,9 @@ export async function logout(formData?: FormData) {
   revalidatePath('/dashboard/contracts')
   revalidatePath('/api/contracts')
   
-  console.log('[Logout] Session destroyed successfully')
+  logger.info('[Logout] Session destroyed successfully', {
+    context: 'Auth',
+  })
   
   return { 
     success: true, 
@@ -233,6 +425,18 @@ export async function forgotPassword(formData: FormData) {
       success: false, 
       errors: formatZodErrors(validated.error.flatten().fieldErrors) 
     }
+  }
+
+  const forgotPasswordRateLimit = await enforceAuthRateLimits({
+    action: 'forgot-password',
+    email: validated.data.email,
+    ipOptions: FORGOT_PASSWORD_IP_RATE_LIMIT,
+    emailOptions: FORGOT_PASSWORD_EMAIL_RATE_LIMIT,
+    message: 'Too many reset requests. Please try again later.',
+  })
+
+  if (forgotPasswordRateLimit) {
+    return forgotPasswordRateLimit
   }
   
   try {
@@ -341,7 +545,12 @@ export async function updateProfileAction(formData: FormData) {
     const timezone = formData.get('timezone') as string | null
     
     // 3. Build update object
-    const updates: any = {}
+    const updates: {
+      full_name?: string
+      avatar_url?: string
+      email_notifications?: boolean
+      timezone?: string
+    } = {}
     if (fullName !== null && fullName.trim() !== '') {
       updates.full_name = fullName.trim()
     }
@@ -355,8 +564,17 @@ export async function updateProfileAction(formData: FormData) {
       updates.timezone = timezone.trim()
     }
     
+    const validationResult = profileUpdateSchema.safeParse(updates)
+
+    if (!validationResult.success) {
+      return {
+        success: false,
+        error: validationResult.error.issues[0]?.message || 'Invalid profile settings',
+      }
+    }
+
     // 4. Update profile
-    const profile = await updateProfile(user.id, updates)
+    const profile = await updateProfile(user.id, validationResult.data)
     
     if (!profile) {
       return { 
@@ -371,7 +589,7 @@ export async function updateProfileAction(formData: FormData) {
       data: profile 
     }
   } catch (error) {
-    console.error('Error updating profile:', error)
+    logSanitizedAuthError('[Profile] Update failed:', error)
     return { 
       success: false, 
       error: 'An error occurred while updating your profile. Please try again.' 

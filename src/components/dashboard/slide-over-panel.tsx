@@ -14,7 +14,7 @@ interface SlideOverPanelProps {
   description?: string
   children: React.ReactNode
   footer?: React.ReactNode
-  width?: "sm" | "md" | "lg" | "xl"
+  width?: "sm" | "md" | "lg" | "xl" | "2xl"
 }
 
 export function SlideOverPanel({
@@ -30,7 +30,8 @@ export function SlideOverPanel({
     sm: "max-w-sm",
     md: "max-w-md",
     lg: "max-w-lg",
-    xl: "max-w-xl",
+    xl: "max-w-2xl",
+    "2xl": "max-w-4xl",
   }
 
   return (
@@ -47,7 +48,9 @@ export function SlideOverPanel({
       {/* Panel */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] bg-[#0a0a0a] border-t border-white/10 shadow-2xl rounded-t-2xl transition-transform duration-300 ease-out flex flex-col",
+          "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] w-full flex-col bg-[#0a0a0a] shadow-2xl transition-transform duration-300 ease-out",
+          "border-t border-white/10 rounded-t-2xl sm:bottom-4 sm:rounded-2xl sm:border",
+          widthClasses[width],
           open ? "translate-y-0" : "translate-y-full"
         )}
       >

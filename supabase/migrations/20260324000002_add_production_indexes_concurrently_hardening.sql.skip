@@ -1,0 +1,32 @@
+-- ============================================
+-- Migration (manual): Add hardening indexes concurrently for production
+-- IMPORTANT:
+--   - Run manually in production SQL editor or psql.
+--   - CREATE INDEX CONCURRENTLY cannot run inside transaction blocks.
+-- ============================================
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Contracts listing/search hot paths
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_contracts_user_id_end_date
+  ON public.contracts(user_id, end_date);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_contracts_name_gin
+  ON public.contracts USING gin (name gin_trgm_ops);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_contracts_vendor_gin
+  ON public.contracts USING gin (vendor gin_trgm_ops);
+
+-- Billing webhook worker claim/retry scans
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_billing_webhook_inbox_claimable
+  ON public.billing_webhook_inbox(processing_status, next_attempt_at, received_at, processing_claimed_at)
+  WHERE processing_status IN ('pending', 'failed');
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_billing_webhook_inbox_claim_token
+  ON public.billing_webhook_inbox(processing_claim_token)
+  WHERE processing_claim_token IS NOT NULL;
+
+-- Reminder stuck-claim health scans
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reminders_stuck_claims
+  ON public.reminders(processing_claimed_at)
+  WHERE sent_at IS NULL;

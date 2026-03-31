@@ -68,7 +68,7 @@ export function RemindersStep({
       {formData.emailReminders && (
         <FormField
           label="Additional Notification Emails"
-          helper="Separate multiple emails with commas"
+          helper="The contract owner email is included automatically. Separate additional emails with commas."
         >
           <Input
             placeholder="e.g., team@company.com, finance@company.com"

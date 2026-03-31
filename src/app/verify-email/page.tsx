@@ -2,62 +2,94 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { redirect } from 'next/navigation'
+import { useSupabaseClient } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
+import type { User } from '@supabase/supabase-js'
 
 export default function VerifyEmailPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [verifying, setVerifying] = useState(false)
-  const supabase = createClient()
+  const supabase = useSupabaseClient()
 
   useEffect(() => {
+    let isActive = true
+    let redirectTimer: ReturnType<typeof setTimeout> | null = null
+
+    const navigateTo = (path: string) => {
+      if (!isActive) {
+        return
+      }
+      router.replace(path)
+    }
+
     const checkUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          redirect('/login')
+        const {
+          data: { user: currentUser },
+          error,
+        } = await supabase.auth.getUser()
+
+        if (error || !currentUser) {
+          if (error) {
+            logger.error('Error checking user:', error, 'VerifyEmailPage')
+          }
+          navigateTo('/login')
+          return
         }
-        setUser(user)
-        
+
+        if (!isActive) {
+          return
+        }
+
+        setUser(currentUser)
+
         // Check if already verified
-        if (user.email_confirmed_at) {
-          redirect('/dashboard')
+        if (currentUser.email_confirmed_at) {
+          navigateTo('/dashboard')
         }
       } catch (error) {
         logger.error('Error checking user:', error, 'VerifyEmailPage')
-        redirect('/login')
+        navigateTo('/login')
       } finally {
-        setLoading(false)
+        if (isActive) {
+          setLoading(false)
+        }
       }
     }
 
-    checkUser()
+    void checkUser()
 
     // Listen for auth state changes from Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user?.email_confirmed_at) {
         // Email is now confirmed, redirect to dashboard
         setVerifying(true)
-        setTimeout(() => {
-          redirect('/dashboard')
+        if (redirectTimer) {
+          clearTimeout(redirectTimer)
+        }
+        redirectTimer = setTimeout(() => {
+          navigateTo('/dashboard')
         }, 1000) // Small delay for smooth transition
       }
     })
 
     // Listen for custom auth-state-changed event (dispatched after email verification)
     const handleAuthStateChange = () => {
-      checkUser()
+      void checkUser()
     }
     window.addEventListener('auth-state-changed', handleAuthStateChange)
 
     return () => {
+      isActive = false
+      if (redirectTimer) {
+        clearTimeout(redirectTimer)
+      }
       subscription.unsubscribe()
       window.removeEventListener('auth-state-changed', handleAuthStateChange)
     }
-  }, [supabase])
+  }, [router, supabase])
 
   if (loading) {
     return (

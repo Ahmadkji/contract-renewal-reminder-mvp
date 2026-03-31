@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr'
 import { useState } from 'react'
-import { env } from '@/lib/env'
+import { publicEnv as env } from '@/lib/env/public'
 
 export const createClient = () =>
   createBrowserClient(

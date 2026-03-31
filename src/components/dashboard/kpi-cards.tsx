@@ -5,25 +5,10 @@ import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/utils/date-utils";
 import { FileText, Calendar, CheckCircle, Mail, TrendingUp, AlertTriangle } from "lucide-react";
 import { logger } from "@/lib/logger";
-
-// ============================================
-// Types
-// ============================================
-interface Contract {
-  id: string;
-  name: string;
-  vendor: string;
-  type: "license" | "service" | "support" | "subscription";
-  startDate: string;  // ISO 8601 string from API
-  endDate: string;    // ISO 8601 string from API
-  expiryDate: string;
-  daysLeft: number;
-  status: "active" | "expiring" | "critical" | "renewing";
-  value?: number;
-}
+import type { ContractSummary } from "@/types/contract";
 
 interface KPICardsProps {
-  contracts: Contract[];
+  contracts: ContractSummary[];
 }
 
 interface KPICardData {

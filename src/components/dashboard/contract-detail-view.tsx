@@ -13,69 +13,28 @@ import { formatDate, formatCurrency, getDaysUntil } from "@/lib/utils/date-utils
 import {
   Calendar, Building2, DollarSign, Clock, Bell, FileText,
   Tag, Mail, CheckCircle, AlertTriangle, XCircle, ExternalLink,
-  Trash2, MoreHorizontal, ArrowLeft, Pencil, X
+  Trash2, Pencil
 } from "lucide-react"
-
-// ============================================
-// Types
-// ============================================
-interface ContractDetail {
-  id: string
-  name: string
-  vendor: string
-  type: "license" | "service" | "support" | "subscription"
-  status: "active" | "expiring" | "critical" | "renewing"
-  
-  // Dates
-  startDate: string  // ISO 8601 string from API
-  endDate: string    // ISO 8601 string from API
-  createdAt: string  // ISO 8601 string from API
-  updatedAt: string  // ISO 8601 string from API
-  
-  // Financial
-  value: number
-  currency: string
-  
-  // Vendor
-  vendorContact: string
-  vendorEmail: string
-  
-  // Terms
-  autoRenew: boolean
-  renewalTerms: string
-  
-  // Reminders
-  reminderDays: number[]
-  emailReminders: boolean
-  notifyEmails: string[]
-  
-  // Other
-  notes: string
-  tags: string[]
-  
-  // Activity
-  activity: ActivityItem[]
-}
-
-interface ActivityItem {
-  id: string
-  type: "created" | "updated" | "reminder" | "renewed" | "note"
-  message: string
-  date: string  // ISO 8601 string from API
-  user?: string
-}
+import { useContract } from "@/hooks/use-contracts"
+import type { ContractActivityItem, ContractDetail, ContractStatus, ContractType } from "@/types/contract"
 
 // ============================================
 // Helpers
 // ============================================
-const statusConfig = {
+const statusConfig: Record<ContractStatus, {
+  label: string
+  color: string
+  bgColor: string
+  borderColor: string
+  icon: typeof CheckCircle
+}> = {
   active: { label: "Active", color: "#22c55e", bgColor: "bg-[#22c55e]/15", borderColor: "border-[#22c55e]/30", icon: CheckCircle },
   expiring: { label: "Expiring Soon", color: "#eab308", bgColor: "bg-[#eab308]/15", borderColor: "border-[#eab308]/30", icon: AlertTriangle },
   critical: { label: "Critical", color: "#ef4444", bgColor: "bg-[#ef4444]/15", borderColor: "border-[#ef4444]/30", icon: XCircle },
   renewing: { label: "Renewing", color: "#3b82f6", bgColor: "bg-[#3b82f6]/15", borderColor: "border-[#3b82f6]/30", icon: Clock },
 }
 
-const typeLabels = {
+const typeLabels: Record<ContractType, string> = {
   license: "Software License",
   subscription: "Subscription",
   service: "Service Agreement",
@@ -90,7 +49,7 @@ interface ContractDetailViewProps {
   onOpenChange: (open: boolean) => void
   contractId?: string
   onDelete?: (id: string) => void
-  onEdit?: (id: string) => void
+  onEdit?: (contract: ContractDetail) => void
 }
 
 export function ContractDetailView({
@@ -100,42 +59,19 @@ export function ContractDetailView({
   onDelete,
   onEdit
 }: ContractDetailViewProps) {
-  const [contract, setContract] = React.useState<ContractDetail | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-  
-  // Fetch contract data from API
-  React.useEffect(() => {
-    if (open && contractId) {
-      setLoading(true)
-      setError(null)
-      
-      // Call API endpoint
-      fetch(`/api/contracts/${contractId}`)
-        .then(res => {
-          if (!res.ok) throw new Error('Failed to fetch contract')
-          return res.json()
-        })
-        .then(data => {
-          setContract(data.data)
-          setLoading(false)
-        })
-        .catch(err => {
-          setError(err.message || 'Failed to fetch contract')
-          setLoading(false)
-        })
-    } else {
-      setContract(null)
-      setError(null)
-    }
-  }, [open, contractId])
+  const detailQuery = useContract(contractId, open && Boolean(contractId))
+  const contract = open ? detailQuery.data ?? null : null
+  const loading = open && detailQuery.isLoading
+  const error = open && detailQuery.error instanceof Error
+    ? detailQuery.error.message
+    : null
 
   const status = contract ? statusConfig[contract.status] : null
   const daysLeft = contract ? getDaysUntil(contract.endDate) : 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-[calc(100%-2rem)] sm:max-w-4xl max-h-[92vh] overflow-y-auto px-5 sm:px-8">
         <DialogHeader>
           <DialogTitle>Contract Details</DialogTitle>
         </DialogHeader>
@@ -155,73 +91,75 @@ export function ContractDetailView({
         </div>
       ) : contract ? (
         <div className="space-y-6">
-              {/* Header Section */}
-              <div className="flex items-start gap-4">
-                <div 
-                  className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: `${status?.color}20`, border: `1px solid ${status?.color}40` }}
-                >
-                  <FileText className="w-6 h-6" style={{ color: status?.color }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-xl font-semibold text-white truncate">{contract.name}</h2>
-                  <p className="text-sm text-white/60 mt-1">{contract.vendor}</p>
-                  <div className="flex items-center gap-3 mt-3">
-                    {status && (
-                      <span className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                        status.bgColor, status.borderColor, "border"
-                      )}>
-                        <status.icon className="w-3 h-3" style={{ color: status.color }} />
-                        <span style={{ color: status.color }}>{status.label}</span>
-                      </span>
-                    )}
-                    <span className="text-xs text-white/40">
-                      {typeLabels[contract.type]}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Countdown Banner */}
-              <div className={cn(
-                "p-4 rounded-xl border",
-                daysLeft <= 7 ? "bg-[#ef4444]/10 border-[#ef4444]/30" :
-                daysLeft <= 30 ? "bg-[#eab308]/10 border-[#eab308]/30" :
-                "bg-[#06b6d4]/10 border-[#06b6d4]/30"
-              )}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white/60">Expires in</p>
-                    <p className={cn(
-                      "text-2xl font-bold",
-                      daysLeft <= 7 ? "text-[#ef4444]" :
-                      daysLeft <= 30 ? "text-[#eab308]" :
-                      "text-white"
-                    )}>
-                      {daysLeft} days
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-white/60">End Date</p>
-                    <p className="text-lg font-medium text-white">{formatDate(contract.endDate)}</p>
-                  </div>
-                </div>
-                <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                {/* Header Section */}
+                <div className="flex items-start gap-4">
                   <div 
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      daysLeft <= 7 ? "bg-[#ef4444]" :
-                      daysLeft <= 30 ? "bg-[#eab308]" :
-                      "bg-[#06b6d4]"
-                    )}
-                    style={{ width: `${Math.max(5, 100 - (daysLeft / 365 * 100))}%` }}
-                  />
+                    className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: `${status?.color}20`, border: `1px solid ${status?.color}40` }}
+                  >
+                    <FileText className="w-6 h-6" style={{ color: status?.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-semibold text-white break-words">{contract.name}</h2>
+                    <p className="text-sm text-white/60 mt-1 break-words">{contract.vendor}</p>
+                    <div className="flex items-center gap-3 mt-3">
+                      {status && (
+                        <span className={cn(
+                          "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                          status.bgColor, status.borderColor, "border"
+                        )}>
+                          <status.icon className="w-3 h-3" style={{ color: status.color }} />
+                          <span style={{ color: status.color }}>{status.label}</span>
+                        </span>
+                      )}
+                      <span className="text-xs text-white/40">
+                        {typeLabels[contract.type]}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Countdown Banner */}
+                <div className={cn(
+                  "p-4 rounded-xl border",
+                  daysLeft <= 7 ? "bg-[#ef4444]/10 border-[#ef4444]/30" :
+                  daysLeft <= 30 ? "bg-[#eab308]/10 border-[#eab308]/30" :
+                  "bg-[#06b6d4]/10 border-[#06b6d4]/30"
+                )}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white/60">Expires in</p>
+                      <p className={cn(
+                        "text-2xl font-bold",
+                        daysLeft <= 7 ? "text-[#ef4444]" :
+                        daysLeft <= 30 ? "text-[#eab308]" :
+                        "text-white"
+                      )}>
+                        {daysLeft} days
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-white/60">End Date</p>
+                      <p className="text-lg font-medium text-white">{formatDate(contract.endDate)}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                    <div 
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500",
+                        daysLeft <= 7 ? "bg-[#ef4444]" :
+                        daysLeft <= 30 ? "bg-[#eab308]" :
+                        "bg-[#06b6d4]"
+                      )}
+                      style={{ width: `${Math.max(5, 100 - (daysLeft / 365 * 100))}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Three Column Layout */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {/* Column 1: Key Details */}
                 <div className="space-y-4">
                   <h3 className="text-xs font-medium text-white/40 uppercase tracking-wider">Key Details</h3>
@@ -265,14 +203,14 @@ export function ContractDetailView({
                   <DetailRow 
                     icon={<Mail className="w-4 h-4" />}
                     label="Contact"
-                    value={contract.vendorContact}
+                    value={contract.vendorContact || "-"}
                   />
                   
                   <DetailRow 
                     icon={<ExternalLink className="w-4 h-4" />}
                     label="Email"
-                    value={contract.vendorEmail}
-                    isLink
+                    value={contract.vendorEmail || "-"}
+                    isLink={Boolean(contract.vendorEmail)}
                   />
                 </div>
 
@@ -372,7 +310,7 @@ export function ContractDetailView({
             Delete
           </button>
           <button
-            onClick={() => onEdit?.(contract.id)}
+            onClick={() => onEdit?.(contract)}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-[#06b6d4] hover:bg-[#06b6d4]/10 rounded-lg transition-colors"
           >
             <Pencil className="w-4 h-4" />
@@ -409,12 +347,12 @@ function DetailRow({
       <div className="flex-1 min-w-0">
         <p className="text-xs text-white/40">{label}</p>
         {isLink ? (
-          <a href={`mailto:${value}`} className="text-sm text-[#06b6d4] hover:underline truncate block">
+          <a href={`mailto:${value}`} className="text-sm text-[#06b6d4] hover:underline block break-all">
             {value}
           </a>
         ) : (
           <p className={cn(
-            "text-sm truncate",
+            "text-sm whitespace-normal break-words",
             highlight ? "text-white font-medium" : "text-white/80"
           )}>
             {value}
@@ -425,7 +363,7 @@ function DetailRow({
   )
 }
 
-function ActivityTimelineItem({ item }: { item: ActivityItem }) {
+function ActivityTimelineItem({ item }: { item: ContractActivityItem }) {
   const iconMap = {
     created: { icon: CheckCircle, color: "text-[#22c55e]", bg: "bg-[#22c55e]/15" },
     updated: { icon: CheckCircle, color: "text-[#3b82f6]", bg: "bg-[#3b82f6]/15" },

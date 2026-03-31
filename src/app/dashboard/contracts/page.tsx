@@ -1,90 +1,119 @@
 "use client";
 
-import Link from "next/link";
 import {
   FileText,
-  Plus,
   Search,
-  Download,
   MoreHorizontal,
 } from "lucide-react";
-import { useState, useEffect, memo, useCallback } from "react";
-import { toast } from "@/hooks/use-toast";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { ANIMATION_DELAY_MS } from "@/lib/constants";
-import { logger } from "@/lib/logger";
+import { useContracts } from "@/hooks/use-contracts";
+import { useDashboardUI } from "@/components/dashboard/dashboard-ui-context";
+import type { ContractSummary } from "@/types/contract";
 
-// ============================================
-// Types
-// ============================================
-interface Contract {
-  id: string;
-  name: string;
-  vendor: string;
-  type: "license" | "service" | "support" | "subscription";
-  expiryDate: string;
-  daysLeft: number;
-  status: "active" | "expiring" | "critical" | "renewing";
-  value?: number;
+type ContractFilterStatus = "all" | ContractSummary["status"];
+
+interface ContractsToolbarProps {
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
+  filterStatus: ContractFilterStatus;
+  onFilterStatusChange: (value: ContractFilterStatus) => void;
 }
 
-// ============================================
-// API fetch function (client-safe)
-// ============================================
-async function fetchContracts(page: number = 1, limit: number = 50): Promise<{ contracts: Contract[]; total: number }> {
-  const response = await fetch(`/api/contracts?page=${page}&limit=${limit}`, {
-    headers: {
-      'Origin': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
-    }
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to fetch contracts');
+function getStatusColor(status: ContractSummary["status"]) {
+  switch (status) {
+    case "active":
+      return "bg-[#22c55e]";
+    case "expiring":
+      return "bg-[#eab308]";
+    case "critical":
+      return "bg-[#ef4444]";
+    case "renewing":
+      return "bg-[#3b82f6]";
+    default:
+      return "bg-[#22c55e]";
   }
-  
-  const result = await response.json();
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch contracts');
-  }
-  
-  return {
-    contracts: result.data,
-    total: result.pagination.total
-  };
 }
 
-// ============================================
-// Contracts Page Component
-// ============================================
+function getStatusBadge(status: ContractSummary["status"]) {
+  switch (status) {
+    case "active":
+      return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
+    case "expiring":
+      return { bg: "bg-[#eab308]/20", text: "text-[#eab308]", label: "Expiring" };
+    case "critical":
+      return { bg: "bg-[#ef4444]/20", text: "text-[#ef4444]", label: "Critical" };
+    case "renewing":
+      return { bg: "bg-[#3b82f6]/20", text: "text-[#3b82f6]", label: "Renewing" };
+    default:
+      return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
+  }
+}
+
+function getTypeLabel(type: ContractSummary["type"]) {
+  switch (type) {
+    case "license":
+      return "License";
+    case "service":
+      return "Service";
+    case "support":
+      return "Support";
+    case "subscription":
+      return "Subscription";
+    default:
+      return type;
+  }
+}
+
+function formatValue(value?: number) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function ContractsPage() {
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { openContractDetail } = useDashboardUI();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<ContractFilterStatus>("all");
 
   useEffect(() => {
-    async function loadContracts() {
-      try {
-        const data = await fetchContracts(1, 50);
-        setContracts(data.contracts);
-      } catch (error) {
-        logger.error("Failed to load contracts:", error, 'ContractsPage');
-        toast({
-          title: "Error",
-          description: "Failed to load contracts",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadContracts();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 300);
 
-  const handleContractClick = useCallback((contractId: string) => {
-    if ((window as any).openContractDetail) {
-      (window as any).openContractDetail(contractId);
-    }
-  }, []);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  if (loading) {
+  const { data, isLoading, error } = useContracts(1, 50, undefined, {
+    search: debouncedSearchQuery,
+  });
+
+  const filteredContracts = useMemo(() => {
+    const contracts = data?.contracts ?? [];
+    if (filterStatus === "all") {
+      return contracts;
+    }
+
+    return contracts.filter((contract) => contract.status === filterStatus);
+  }, [data?.contracts, filterStatus]);
+
+  const hasActiveFilters = debouncedSearchQuery.length > 0 || filterStatus !== "all";
+
+  const handleContractClick = useCallback(
+    (contractId: string) => {
+      openContractDetail(contractId);
+    },
+    [openContractDetail]
+  );
+
+  if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto p-8">
         <div className="text-center text-[#a3a3a3]">Loading contracts...</div>
@@ -92,9 +121,18 @@ export default function ContractsPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto p-8">
+        <div className="text-center text-red-400">
+          Failed to load contracts. Please try again.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Page Title */}
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
           Contracts
@@ -104,53 +142,58 @@ export default function ContractsPage() {
         </p>
       </div>
 
-      {/* Toolbar */}
-      <ContractsToolbar />
+      <ContractsToolbar
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        filterStatus={filterStatus}
+        onFilterStatusChange={setFilterStatus}
+      />
 
-      {/* Contracts Table */}
-      <ContractsTable 
-        contracts={contracts}
+      <ContractsTable
+        contracts={filteredContracts}
         onContractClick={handleContractClick}
+        hasActiveFilters={hasActiveFilters}
       />
     </div>
   );
 }
 
-// ============================================
-// Contracts Toolbar Component
-// ============================================
-function ContractsToolbar() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+function ContractsToolbar({
+  searchQuery,
+  onSearchQueryChange,
+  filterStatus,
+  onFilterStatusChange,
+}: ContractsToolbarProps) {
   const [visible, setVisible] = useState(false);
 
-  // Animation
   useEffect(() => {
     const timer = setTimeout(() => setVisible(true), ANIMATION_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 
   return (
-    <div className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-500 ${
-      visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-    }`}>
-      {/* Search */}
+    <div
+      className={`flex flex-col sm:flex-row gap-4 mb-6 transition-all duration-500 ${
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+      }`}
+    >
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#a3a3a3]" />
         <input
           type="text"
           placeholder="Search contracts..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(event) => onSearchQueryChange(event.target.value)}
           className="w-full h-10 pl-10 pr-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white placeholder-[#a3a3a3] focus:outline-none focus:border-[#06b6d4] focus:ring-2 focus:ring-[#06b6d4]/20 transition-all"
         />
       </div>
 
-      {/* Filter & Export */}
       <div className="flex items-center gap-2">
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(event) =>
+            onFilterStatusChange(event.target.value as ContractFilterStatus)
+          }
           className="h-10 px-3 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-[#06b6d4] transition-all"
         >
           <option value="all">All Status</option>
@@ -159,64 +202,22 @@ function ContractsToolbar() {
           <option value="critical">Critical</option>
           <option value="renewing">Renewing</option>
         </select>
-
-        <button className="h-10 px-4 bg-[#141414] border border-white/[0.08] rounded-lg text-sm text-[#a3a3a3] hover:text-white hover:border-white/20 transition-all flex items-center gap-2">
-          <Download className="w-4 h-4" />
-          Export
-        </button>
       </div>
     </div>
   );
 }
 
-// ============================================
-// Contracts Table Component
-// ============================================
-const ContractsTable = memo(function ContractsTable({ 
-  contracts, 
-  onContractClick 
-}: { 
-  contracts: Contract[];
+function ContractsTable({
+  contracts,
+  onContractClick,
+  hasActiveFilters,
+}: {
+  contracts: ContractSummary[];
   onContractClick: (id: string) => void;
+  hasActiveFilters: boolean;
 }) {
-  const getStatusColor = useCallback((status: Contract["status"]) => {
-    switch (status) {
-      case "active": return "bg-[#22c55e]";
-      case "expiring": return "bg-[#eab308]";
-      case "critical": return "bg-[#ef4444]";
-      case "renewing": return "bg-[#3b82f6]";
-      default: return "bg-[#22c55e]";
-    }
-  }, []);
-
-  const getStatusBadge = useCallback((status: Contract["status"]) => {
-    switch (status) {
-      case "active": return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
-      case "expiring": return { bg: "bg-[#eab308]/20", text: "text-[#eab308]", label: "Expiring" };
-      case "critical": return { bg: "bg-[#ef4444]/20", text: "text-[#ef4444]", label: "Critical" };
-      case "renewing": return { bg: "bg-[#3b82f6]/20", text: "text-[#3b82f6]", label: "Renewing" };
-      default: return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
-    }
-  }, []);
-
-  const getTypeLabel = useCallback((type: Contract["type"]) => {
-    switch (type) {
-      case "license": return "License";
-      case "service": return "Service";
-      case "support": return "Support";
-      case "subscription": return "Subscription";
-      default: return type;
-    }
-  }, []);
-
-  const formatValue = useCallback((value?: number) => {
-    if (!value) return "-";
-    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
-  }, []);
-
   return (
     <div className="bg-[#141414] border border-white/[0.08] rounded-xl overflow-hidden">
-      {/* Table Header */}
       <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 border-b border-white/[0.08] text-xs font-medium text-[#a3a3a3] uppercase tracking-wider">
         <div className="col-span-4">Contract</div>
         <div className="col-span-2">Type</div>
@@ -225,10 +226,10 @@ const ContractsTable = memo(function ContractsTable({
         <div className="col-span-2 text-right">Days Left</div>
       </div>
 
-      {/* Table Body */}
       <div className="divide-y divide-white/5">
         {contracts.map((contract, index) => {
           const badge = getStatusBadge(contract.status);
+
           return (
             <div
               key={contract.id}
@@ -236,44 +237,51 @@ const ContractsTable = memo(function ContractsTable({
               className="group grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 p-4 hover:bg-[#1a1a1a] transition-all duration-200 cursor-pointer"
               style={{ transitionDelay: `${index * 30}ms` }}
             >
-              {/* Contract Info */}
               <div className="col-span-4 flex items-center gap-3">
                 <div
                   className={`w-1 h-10 rounded-full ${getStatusColor(contract.status)} transition-all duration-200 group-hover:w-1.5`}
                 />
                 <div className="min-w-0">
-                  <div className="text-sm font-medium text-white truncate">{contract.name}</div>
-                  <div className="text-xs text-[#a3a3a3] truncate">{contract.vendor}</div>
+                  <div className="text-sm font-medium text-white truncate">
+                    {contract.name}
+                  </div>
+                  <div className="text-xs text-[#a3a3a3] truncate">
+                    {contract.vendor}
+                  </div>
                 </div>
               </div>
 
-              {/* Type */}
               <div className="col-span-2 flex items-center">
-                <span className="text-sm text-[#a3a3a3]">{getTypeLabel(contract.type)}</span>
+                <span className="text-sm text-[#a3a3a3]">
+                  {getTypeLabel(contract.type)}
+                </span>
               </div>
 
-              {/* Value */}
               <div className="col-span-2 flex items-center">
-                <span className="text-sm text-white font-medium">{formatValue(contract.value)}</span>
+                <span className="text-sm text-white font-medium">
+                  {formatValue(contract.value)}
+                </span>
               </div>
 
-              {/* Status */}
               <div className="col-span-2 flex items-center">
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${badge.bg} ${badge.text}`}>
+                <span
+                  className={`px-2 py-0.5 text-xs font-medium rounded-full ${badge.bg} ${badge.text}`}
+                >
                   {badge.label}
                 </span>
               </div>
 
-              {/* Days Left */}
               <div className="col-span-2 flex items-center justify-between sm:justify-end gap-2">
                 <div className="text-right">
-                  <div className="text-lg font-semibold text-white">{contract.daysLeft}</div>
+                  <div className="text-lg font-semibold text-white">
+                    {contract.daysLeft}
+                  </div>
                   <div className="text-[10px] text-[#a3a3a3]">days left</div>
                 </div>
                 <button
                   className="w-8 h-8 flex items-center justify-center text-[#a3a3a3] opacity-0 group-hover:opacity-100 transition-opacity rounded-lg hover:bg-white/10"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={(event) => {
+                    event.stopPropagation();
                     onContractClick(contract.id);
                   }}
                 >
@@ -285,27 +293,35 @@ const ContractsTable = memo(function ContractsTable({
         })}
       </div>
 
-      {/* Empty State */}
       {contracts.length === 0 && (
         <div className="p-8 text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-white/5 flex items-center justify-center">
             <FileText className="w-6 h-6 text-[#a3a3a3]" />
           </div>
-          <p className="text-sm text-[#a3a3a3] mb-4">No contracts found</p>
+          <p className="text-sm text-[#a3a3a3] mb-4">
+            {hasActiveFilters
+              ? "No contracts matched your search/filter"
+              : "No contracts found"}
+          </p>
         </div>
       )}
 
-      {/* Footer */}
       {contracts.length > 0 && (
         <div className="px-4 py-3 border-t border-white/[0.08] flex items-center justify-between">
           <span className="text-xs text-[#a3a3a3]">
             Showing {contracts.length} contracts
           </span>
           <div className="flex items-center gap-2">
-            <button className="px-3 py-1.5 text-xs text-[#a3a3a3] hover:text-white transition-colors disabled:opacity-50" disabled>
+            <button
+              className="px-3 py-1.5 text-xs text-[#a3a3a3] hover:text-white transition-colors disabled:opacity-50"
+              disabled
+            >
               Previous
             </button>
-            <button className="px-3 py-1.5 text-xs text-[#a3a3a3] hover:text-white transition-colors disabled:opacity-50" disabled>
+            <button
+              className="px-3 py-1.5 text-xs text-[#a3a3a3] hover:text-white transition-colors disabled:opacity-50"
+              disabled
+            >
               Next
             </button>
           </div>
@@ -313,4 +329,4 @@ const ContractsTable = memo(function ContractsTable({
       )}
     </div>
   );
-});
+}

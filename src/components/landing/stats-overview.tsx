@@ -48,22 +48,22 @@ export function StatsOverview() {
     {
       icon: <CheckCircle className="w-6 h-6 text-emerald-500" />,
       iconColor: "bg-emerald-500/20",
-      metric: "24",
-      label: "Active Contracts",
+      metric: "Track",
+      label: "Contract status in one dashboard",
       delay: "card-stagger-1",
     },
     {
       icon: <AlertCircle className="w-6 h-6 text-amber-500" />,
       iconColor: "bg-amber-500/20",
-      metric: "3",
-      label: "Expiring Soon",
+      metric: "Alert",
+      label: "Configurable reminder schedules",
       delay: "card-stagger-2",
     },
     {
       icon: <LayoutDashboard className="w-6 h-6 text-cyan-500" />,
       iconColor: "bg-cyan-500/20",
-      metric: "$12.4k",
-      label: "Total Savings",
+      metric: "Review",
+      label: "Billing and export controls",
       delay: "card-stagger-3",
     },
   ];

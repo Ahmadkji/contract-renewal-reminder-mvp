@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toDateOnlyString } from '@/lib/utils/date-utils';
 
 /**
  * Zod schema for contract input validation
@@ -22,6 +23,24 @@ const dateStringSchema = z.string().refine(
   { message: 'Invalid date format. Use YYYY-MM-DD or ISO datetime format.' }
 );
 
+const optionalTrimmedStringSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  },
+  z.string().optional()
+);
+
+const optionalEmailSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    return trimmed === '' ? undefined : trimmed;
+  },
+  z.string().email({ message: 'Invalid email format' }).optional()
+);
+
 export const contractInputSchema = z.object({
   name: z.string()
     .min(1, { message: 'Contract name is required' })
@@ -43,18 +62,13 @@ export const contractInputSchema = z.object({
   autoRenew: z.boolean()
     .optional()
     .default(false),
-  renewalTerms: z.string()
-    .optional(),
-  notes: z.string()
-    .optional(),
+  renewalTerms: optionalTrimmedStringSchema,
+  notes: optionalTrimmedStringSchema,
   tags: z.array(z.string())
     .optional()
     .default([]),
-  vendorContact: z.string()
-    .optional(),
-  vendorEmail: z.string()
-    .email({ message: 'Invalid email format' })
-    .optional(),
+  vendorContact: optionalTrimmedStringSchema,
+  vendorEmail: optionalEmailSchema,
   reminderDays: z.array(z.number().int().min(1).max(365))
     .optional()
     .default([30, 14, 7]),
@@ -67,13 +81,23 @@ export const contractInputSchema = z.object({
 }).refine(
   (data) => {
     if (!data.startDate || !data.endDate) return true;
-    const start = new Date(data.startDate);
-    const end = new Date(data.endDate);
-    return start <= end;
+    const start = toDateOnlyString(data.startDate);
+    const end = toDateOnlyString(data.endDate);
+    return Boolean(start) && Boolean(end) && start < end;
   },
   {
     message: 'End date must be after start date',
     path: ['endDate']
+  }
+).refine(
+  (data) => {
+    const hasVendorContact = Boolean(data.vendorContact);
+    const hasVendorEmail = Boolean(data.vendorEmail);
+    return hasVendorContact === hasVendorEmail;
+  },
+  {
+    message: 'Vendor contact and vendor email must be provided together',
+    path: ['vendorEmail']
   }
 );
 

@@ -1,14 +1,16 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * Comprehensive Contract Creation Test
  * Tests the contract creation feature via the API endpoint
  */
 
 const { createClient } = require('@supabase/supabase-js')
+const { requireEnv } = require('./scripts/load-env')
 
 // Supabase configuration
-const SUPABASE_URL = 'https://gxoaatptsggydujezigr.supabase.co'
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4b2FhdHB0c2dneWR1amV6aWdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTIyMDIsImV4cCI6MjA4OTEyODIwMn0.mxKhIHba0MqQP8FKdaeT-AsIgRSKmJc7kr6I4-akFTk'
-const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4b2FhdHB0c2dneWR1amV6aWdyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU1MjIwMiwiZXhwIjoyMDg5MTI4MjAyfQ.OyJ08fKugMki19IfB6xAxwzuaBEetgwQyf6liyHYK44'
+const SUPABASE_URL = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
+const SUPABASE_ANON_KEY = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+const SUPABASE_SERVICE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
 
 // Test configuration
 const APP_URL = 'http://localhost:3000'

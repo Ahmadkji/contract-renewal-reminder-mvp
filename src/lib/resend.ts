@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { serverEnv as env } from '@/lib/env/server';
 
 /**
  * Singleton pattern for Resend client
@@ -13,7 +14,7 @@ let resendInstance: Resend | null = null;
  */
 export function getResendClient(): Resend {
   if (!resendInstance) {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = env.RESEND_API_KEY;
     
     if (!apiKey) {
       throw new Error(
@@ -30,17 +31,11 @@ export function getResendClient(): Resend {
 }
 
 /**
- * Export singleton instance for direct use
- * Usage: import { resend } from '@/lib/resend';
- */
-export const resend = getResendClient();
-
-/**
  * Get default sender email from environment variables
  * @returns {string} Default sender email address
  */
 export function getDefaultFromEmail(): string {
-  const fromEmail = process.env.RESEND_FROM_EMAIL;
+  const fromEmail = env.RESEND_FROM_EMAIL;
   
   if (!fromEmail) {
     throw new Error(
@@ -57,7 +52,7 @@ export function getDefaultFromEmail(): string {
  * @returns {string | undefined} Default sender name or undefined
  */
 export function getDefaultFromName(): string | undefined {
-  return process.env.RESEND_FROM_NAME;
+  return env.RESEND_FROM_NAME;
 }
 
 /**
