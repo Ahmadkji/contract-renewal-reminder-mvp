@@ -50,7 +50,7 @@ function toEditFormData(contract: ContractDetail): ContractFormData {
       contract.reminderDays && contract.reminderDays.length > 0
         ? contract.reminderDays
         : [30, 14, 7],
-    emailReminders: contract.emailReminders ?? true,
+    emailReminders: contract.emailReminders ?? false,
     notifyEmails: contract.notifyEmails ?? [],
   };
 }

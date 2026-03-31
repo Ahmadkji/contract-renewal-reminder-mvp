@@ -100,20 +100,29 @@ export function AddContractForm({
       
       if (error instanceof Error) {
         errorMessage = error.message;
+        const normalizedMessage = errorMessage.toLowerCase();
         
         // Distinguish between error types for better UX
         if (errorMessage.includes('Authentication') || errorMessage.includes('Unauthorized')) {
           errorTitle = "Authentication required";
           errorMessage = "Please sign in and try again.";
+        } else if (
+          normalizedMessage.includes('premium subscription') ||
+          normalizedMessage.includes('feature_requires_premium')
+        ) {
+          errorTitle = "Upgrade required";
+          errorMessage =
+            "Email reminders are available on premium. Turn off 'Send email reminders' or upgrade in Billing.";
         } else if (errorMessage.includes('Validation') || errorMessage.includes('required')) {
           errorTitle = "Validation error";
           errorMessage = "Please check your form data and try again.";
         } else if (errorMessage.includes('vendor contact')) {
           errorTitle = "Vendor contact error";
           errorMessage = "Could not save vendor contact. Please check the email format.";
-        } else if (errorMessage.includes('reminders')) {
+        } else if (normalizedMessage.includes('reminder')) {
           errorTitle = "Reminder error";
-          errorMessage = "Could not save reminders. Please try again.";
+          // Preserve backend context instead of masking with a generic message.
+          errorMessage = error.message;
         } else if (errorMessage.includes('database') || errorMessage.includes('constraint')) {
           errorTitle = "Database error";
           errorMessage = "A database error occurred. Please try again.";

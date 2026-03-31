@@ -19,7 +19,7 @@ export const initialFormData: ContractFormData = {
   autoRenew: false,
   renewalTerms: "",
   reminderDays: [30, 14, 7],
-  emailReminders: true,
+  emailReminders: false,
   notifyEmails: [],
   notes: "",
   tags: [],
