@@ -9,10 +9,45 @@ const publicEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url('Invalid app URL'),
 })
 
+function readEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim()
+  return value ? value : undefined
+}
+
+function toAbsoluteUrl(value: string | undefined): string | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`
+}
+
+function resolvePublicSupabaseUrl(): string | undefined {
+  return readEnv('NEXT_PUBLIC_SUPABASE_URL') ?? readEnv('SUPABASE_URL')
+}
+
+function resolvePublicSupabaseAnonKey(): string | undefined {
+  return (
+    readEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY') ??
+    readEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ??
+    readEnv('SUPABASE_ANON_KEY') ??
+    readEnv('SUPABASE_PUBLISHABLE_KEY')
+  )
+}
+
+function resolveAppUrl(): string | undefined {
+  // Prefer the explicit public URL, but fall back to Vercel's production host when needed.
+  return toAbsoluteUrl(
+    readEnv('NEXT_PUBLIC_APP_URL') ??
+      readEnv('VERCEL_PROJECT_PRODUCTION_URL') ??
+      readEnv('VERCEL_URL')
+  )
+}
+
 export const publicEnv = publicEnvSchema.parse({
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  NEXT_PUBLIC_SUPABASE_URL: resolvePublicSupabaseUrl(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: resolvePublicSupabaseAnonKey(),
+  NEXT_PUBLIC_APP_URL: resolveAppUrl(),
 })
 
 export type PublicEnv = z.infer<typeof publicEnvSchema>
