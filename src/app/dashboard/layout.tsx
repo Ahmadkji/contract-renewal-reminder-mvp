@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { MobileMenu } from "@/components/dashboard/mobile-menu";
@@ -30,6 +31,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { toDateOnlyString } from "@/lib/utils/date-utils";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 // ============================================
 // Dashboard Layout - Client Component
@@ -303,6 +305,24 @@ function DashboardMainContent({
         {/* Content Area - Children render here */}
         <div className="main-scroll-container dashboard-scroll flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
+          <div className="mx-auto mt-8 max-w-6xl rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-xs text-[#a3a3a3]">
+            <span>Support: </span>
+            <a href={SUPPORT_MAILTO} className="text-cyan-300 hover:text-cyan-200">
+              {SUPPORT_EMAIL}
+            </a>
+            <span className="mx-2 text-white/30">|</span>
+            <Link href="/terms" className="hover:text-white">
+              Terms of Service
+            </Link>
+            <span className="mx-2 text-white/30">|</span>
+            <Link href="/privacy" className="hover:text-white">
+              Privacy Policy
+            </Link>
+            <span className="mx-2 text-white/30">|</span>
+            <Link href="/refund-policy" className="hover:text-white">
+              Refund Policy
+            </Link>
+          </div>
         </div>
       </main>
     </div>

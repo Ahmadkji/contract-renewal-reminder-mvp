@@ -65,6 +65,15 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/**', '.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'examples/**', 'skills/**'],
+    ignores: [
+      'node_modules/**',
+      '.next/**',
+      '.vercel/output/**',
+      'out/**',
+      'build/**',
+      'next-env.d.ts',
+      'examples/**',
+      'skills/**',
+    ],
   },
 ]

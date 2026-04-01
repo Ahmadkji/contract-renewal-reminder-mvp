@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowRight, FileText, Bell, Clock, Shield, CheckCircle2, XCircle } from 'lucide-react'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/legal'
 
 // Password requirement items
 const passwordRequirements = [
@@ -333,6 +334,21 @@ export default function SignupPage() {
                 </>
               )}
             </Button>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              By creating an account, you agree to our{' '}
+              <Link href="/terms" className="text-slate-300 hover:text-white underline underline-offset-2">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-slate-300 hover:text-white underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              . Support:{' '}
+              <a href={SUPPORT_MAILTO} className="text-slate-300 hover:text-white underline underline-offset-2">
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
           </form>
           
           {/* Divider */}

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Loader2, ArrowRight, FileText, Bell, Clock, Shield, Zap } from 'lucide-react'
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '@/lib/legal'
 
 function sanitizeRedirectPath(redirect: string | null): string {
   if (!redirect) return '/dashboard'
@@ -259,6 +260,21 @@ function LoginForm() {
                 </>
               )}
             </Button>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              By continuing, you agree to our{' '}
+              <Link href="/terms" className="text-slate-300 hover:text-white underline underline-offset-2">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="text-slate-300 hover:text-white underline underline-offset-2">
+                Privacy Policy
+              </Link>
+              . Support:{' '}
+              <a href={SUPPORT_MAILTO} className="text-slate-300 hover:text-white underline underline-offset-2">
+                {SUPPORT_EMAIL}
+              </a>
+              .
+            </p>
           </form>
           
           {/* Divider */}

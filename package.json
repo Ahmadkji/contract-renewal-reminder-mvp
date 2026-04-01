@@ -10,6 +10,10 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "audit:security": "npm audit --audit-level=high --omit=dev",
+    "vercel:pull:prod": "npx vercel@latest pull --yes --environment=production",
+    "vercel:build:prod": "npm run vercel:pull:prod && npx vercel@latest build --prod && node scripts/verify-vercel-prebuilt.js",
+    "vercel:deploy:prod": "npx vercel@latest --prod",
+    "vercel:deploy:prebuilt:prod": "node scripts/verify-vercel-prebuilt.js --require-linux-x64 --skip-output-check && npm run vercel:build:prod && npx vercel@latest deploy --prebuilt --prod --archive=tgz",
     "ops:reminders-health": "node scripts/ops/reminders-health-check.js",
     "ops:contracts-explain": "node scripts/ops/contracts-query-plan-check.js",
     "ci:verify": "npm run lint && npm run typecheck && npm run audit:security"

@@ -72,6 +72,26 @@ bun start
 
 Open [http://localhost:3000](http://localhost:3000) to see your application running.
 
+## Vercel Deployments
+
+Use the documented Vercel flow that matches how this app builds:
+
+```bash
+# Preferred: remote production build on Vercel
+npm run vercel:deploy:prod
+
+# Validate a prebuilt artifact locally
+npm run vercel:build:prod
+
+# Deploy a prebuilt artifact only from Linux x64 CI
+npm run vercel:deploy:prebuilt:prod
+```
+
+Notes:
+- `vercel:build:prod` runs `vercel pull`, `vercel build --prod`, and validates `.vercel/output`.
+- `vercel:deploy:prebuilt:prod` is blocked on non-Linux x64 machines because this app uses `sharp` and local native builds may not match Vercel production.
+- `eslint` now ignores `.vercel/output/**` so generated deployment artifacts do not pollute source linting.
+
 ## 🤖 Powered by Z.ai
 
 This scaffold is optimized for use with [Z.ai](https://chat.z.ai) - your AI assistant for:

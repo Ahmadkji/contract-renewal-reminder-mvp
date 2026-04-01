@@ -59,6 +59,7 @@ import {
   ANIMATION_DELAY_VERY_LONG_MS,
   TRANSITION_DELAY_MS,
 } from "@/lib/constants";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site-url";
 import { FAQ_ITEMS, SOCIAL_PROOF_TESTIMONIALS } from "@/components/landing/homepage-static-content";
 
@@ -3083,6 +3084,7 @@ const PRICING_PLANS_NEW = [
     ],
     limitation: "Email reminders and CSV export",
     ctaText: "Start Free",
+    ctaHref: "/signup",
     ctaStyle: "bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-100",
     ctaHeight: "h-11",
     bg: "bg-slate-900",
@@ -3107,6 +3109,7 @@ const PRICING_PLANS_NEW = [
     ],
     limitation: null,
     ctaText: "Choose Monthly",
+    ctaHref: "/login?redirect=%2Fdashboard%2Fbilling",
     ctaStyle: "bg-cyan-600 text-slate-950 hover:bg-cyan-500",
     ctaHeight: "h-12",
     bg: "bg-slate-800",
@@ -3131,6 +3134,7 @@ const PRICING_PLANS_NEW = [
     ],
     limitation: null,
     ctaText: "Choose Yearly",
+    ctaHref: "/login?redirect=%2Fdashboard%2Fbilling",
     ctaStyle: "bg-slate-800 border border-slate-700 text-slate-200 hover:border-violet-400 hover:text-violet-400",
     ctaHeight: "h-11",
     bg: "bg-slate-900",
@@ -3285,12 +3289,13 @@ function PricingSection() {
                 )}
 
                 {/* CTA */}
-                <button
-                  className={`w-full ${plan.ctaHeight} rounded-lg text-sm font-medium transition-all pricing-cta-hover ${plan.ctaStyle}`}
+                <Link
+                  href={plan.ctaHref}
+                  className={`w-full ${plan.ctaHeight} rounded-lg text-sm font-medium transition-all pricing-cta-hover ${plan.ctaStyle} flex items-center justify-center`}
                 >
                   {plan.ctaText}
                   {plan.popular && <ArrowRight className="inline w-4 h-4 ml-2" />}
-                </button>
+                </Link>
               </div>
             </div>
           ))}
@@ -3349,11 +3354,12 @@ function PricingSection() {
               )}
 
               {/* CTA */}
-              <button
-                className={`w-full ${plan.ctaHeight} rounded-lg text-sm font-medium transition-all ${plan.ctaStyle}`}
+              <Link
+                href={plan.ctaHref}
+                className={`w-full ${plan.ctaHeight} rounded-lg text-sm font-medium transition-all ${plan.ctaStyle} flex items-center justify-center`}
               >
                 {plan.ctaText}
-              </button>
+              </Link>
             </div>
           ))}
         </div>
@@ -3365,10 +3371,13 @@ function PricingSection() {
           }`}
           style={{ animationDelay: "700ms" }}
         >
-          <button className="text-sm text-slate-300 hover:text-cyan-400 transition-colors flex items-center justify-center gap-2 mx-auto">
+          <Link
+            href="/login?redirect=%2Fdashboard%2Fbilling"
+            className="group text-sm text-slate-300 hover:text-cyan-400 transition-colors flex items-center justify-center gap-2 mx-auto"
+          >
             Compare all features
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </button>
+          </Link>
         </div>
 
         {/* FAQ Micro-Section */}
@@ -3522,11 +3531,33 @@ function Footer() {
           <p className="text-sm text-slate-400">
             Contract renewals, simplified.
           </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center md:justify-start gap-3 text-xs text-slate-400">
+            <Link href="/privacy" className="hover:text-cyan-300 transition-colors">
+              Privacy Policy
+            </Link>
+            <span className="text-slate-600">|</span>
+            <Link href="/terms" className="hover:text-cyan-300 transition-colors">
+              Terms of Service
+            </Link>
+            <span className="text-slate-600">|</span>
+            <Link href="/refund-policy" className="hover:text-cyan-300 transition-colors">
+              Refund Policy
+            </Link>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Support:{" "}
+            <a href={SUPPORT_MAILTO} className="text-cyan-300 hover:text-cyan-200 transition-colors">
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Payments are processed by Creem as merchant of record.
+          </p>
           {/* Social */}
           <div className="flex items-center justify-center md:justify-start gap-4 mt-4">
-            <Twitter className="w-5 h-5 text-slate-600 hover:text-slate-300 transition-colors cursor-pointer" />
-            <Linkedin className="w-5 h-5 text-slate-600 hover:text-slate-300 transition-colors cursor-pointer" />
-            <Globe className="w-5 h-5 text-slate-600 hover:text-slate-300 transition-colors cursor-pointer" />
+            <Twitter className="w-5 h-5 text-slate-600" />
+            <Linkedin className="w-5 h-5 text-slate-600" />
+            <Globe className="w-5 h-5 text-slate-600" />
           </div>
         </div>
 

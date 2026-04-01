@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpRight,
@@ -12,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 type BillingPlanCode = "monthly" | "yearly";
 type BillingAction = BillingPlanCode | "portal";
@@ -533,6 +535,21 @@ export function BillingPageClient() {
             Pricing data may be delayed. Showing cached values while live pricing refreshes.
           </div>
         )}
+        <div className="mb-5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+          Payments are processed by Creem as merchant of record. By upgrading, you agree to{" "}
+          <Link href="/terms" className="underline underline-offset-2 hover:text-cyan-200">
+            Terms of Service
+          </Link>{" "}
+          and{" "}
+          <Link href="/refund-policy" className="underline underline-offset-2 hover:text-cyan-200">
+            Refund Policy
+          </Link>
+          . Support:{" "}
+          <a href={SUPPORT_MAILTO} className="underline underline-offset-2 hover:text-cyan-200">
+            {SUPPORT_EMAIL}
+          </a>
+          .
+        </div>
         {hasCheckoutCooldown && (
           <div className="mb-5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-200">
             Checkout temporarily limited. Try again in {checkoutCooldownSeconds}s.
