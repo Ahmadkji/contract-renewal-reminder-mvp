@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useSupabaseClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
 import type { User } from '@supabase/supabase-js'
 
@@ -11,17 +11,28 @@ export default function VerifyEmailPage() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [verifying, setVerifying] = useState(false)
-  const supabase = useSupabaseClient()
 
   useEffect(() => {
     let isActive = true
     let redirectTimer: ReturnType<typeof setTimeout> | null = null
+    let unsubscribeAuthListener: (() => void) | null = null
 
     const navigateTo = (path: string) => {
       if (!isActive) {
         return
       }
       router.replace(path)
+    }
+
+    let supabase
+    try {
+      // Build-time prerender only renders the shell; create the browser client after mount.
+      supabase = createClient()
+    } catch (error) {
+      logger.error('Failed to initialize Supabase client:', error, 'VerifyEmailPage')
+      navigateTo('/login')
+      setLoading(false)
+      return () => {}
     }
 
     const checkUser = async () => {
@@ -74,6 +85,7 @@ export default function VerifyEmailPage() {
         }, 1000) // Small delay for smooth transition
       }
     })
+    unsubscribeAuthListener = () => subscription.unsubscribe()
 
     // Listen for custom auth-state-changed event (dispatched after email verification)
     const handleAuthStateChange = () => {
@@ -86,10 +98,10 @@ export default function VerifyEmailPage() {
       if (redirectTimer) {
         clearTimeout(redirectTimer)
       }
-      subscription.unsubscribe()
+      unsubscribeAuthListener?.()
       window.removeEventListener('auth-state-changed', handleAuthStateChange)
     }
-  }, [router, supabase])
+  }, [router])
 
   if (loading) {
     return (
