@@ -3,9 +3,12 @@ import { z } from 'zod'
 /**
  * Public environment variables that are safe for client bundles.
  */
-const publicEnvSchema = z.object({
+const publicSupabaseEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.string().url('Invalid Supabase URL'),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, 'Supabase anon key is required'),
+})
+
+const publicSiteEnvSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url('Invalid app URL'),
 })
 
@@ -44,10 +47,52 @@ function resolveAppUrl(): string | undefined {
   )
 }
 
-export const publicEnv = publicEnvSchema.parse({
-  NEXT_PUBLIC_SUPABASE_URL: resolvePublicSupabaseUrl(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: resolvePublicSupabaseAnonKey(),
-  NEXT_PUBLIC_APP_URL: resolveAppUrl(),
-})
+let cachedPublicSupabaseEnv: z.infer<typeof publicSupabaseEnvSchema> | undefined
+let cachedPublicSiteEnv: z.infer<typeof publicSiteEnvSchema> | undefined
 
-export type PublicEnv = z.infer<typeof publicEnvSchema>
+function getPublicSupabaseEnv() {
+  if (!cachedPublicSupabaseEnv) {
+    cachedPublicSupabaseEnv = publicSupabaseEnvSchema.parse({
+      NEXT_PUBLIC_SUPABASE_URL: resolvePublicSupabaseUrl(),
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: resolvePublicSupabaseAnonKey(),
+    })
+  }
+
+  return cachedPublicSupabaseEnv
+}
+
+function getPublicSiteEnv() {
+  if (!cachedPublicSiteEnv) {
+    cachedPublicSiteEnv = publicSiteEnvSchema.parse({
+      NEXT_PUBLIC_APP_URL: resolveAppUrl(),
+    })
+  }
+
+  return cachedPublicSiteEnv
+}
+
+export type PublicEnv = z.infer<typeof publicSupabaseEnvSchema> &
+  z.infer<typeof publicSiteEnvSchema>
+
+export const publicEnv = {} as PublicEnv
+
+Object.defineProperties(publicEnv, {
+  NEXT_PUBLIC_SUPABASE_URL: {
+    enumerable: true,
+    get() {
+      return getPublicSupabaseEnv().NEXT_PUBLIC_SUPABASE_URL
+    },
+  },
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: {
+    enumerable: true,
+    get() {
+      return getPublicSupabaseEnv().NEXT_PUBLIC_SUPABASE_ANON_KEY
+    },
+  },
+  NEXT_PUBLIC_APP_URL: {
+    enumerable: true,
+    get() {
+      return getPublicSiteEnv().NEXT_PUBLIC_APP_URL
+    },
+  },
+})
