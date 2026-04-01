@@ -23,26 +23,38 @@ const serverOnlyEnvSchema = z.object({
   CRON_SECRET: z.string().min(1, 'CRON_SECRET is required'),
 })
 
-const serverOnlyEnv = serverOnlyEnvSchema.parse({
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  RESEND_API_KEY: process.env.RESEND_API_KEY,
-  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
-  RESEND_FROM_NAME: process.env.RESEND_FROM_NAME,
-  CREEM_API_KEY: process.env.CREEM_API_KEY,
-  CREEM_WEBHOOK_SECRET: process.env.CREEM_WEBHOOK_SECRET,
-  CREEM_API_BASE_URL: process.env.CREEM_API_BASE_URL,
-  CREEM_MONTHLY_PRODUCT_ID: process.env.CREEM_MONTHLY_PRODUCT_ID,
-  CREEM_YEARLY_PRODUCT_ID: process.env.CREEM_YEARLY_PRODUCT_ID,
-  ERROR_TRACKING_WEBHOOK_URL: process.env.ERROR_TRACKING_WEBHOOK_URL,
-  ALERTING_WEBHOOK_URL: process.env.ALERTING_WEBHOOK_URL,
-  CSRF_TRUSTED_ORIGINS: process.env.CSRF_TRUSTED_ORIGINS,
-  RATE_LIMIT_TRUST_PROXY_HEADERS: process.env.RATE_LIMIT_TRUST_PROXY_HEADERS,
-  CRON_SECRET: process.env.CRON_SECRET,
-})
+type ServerOnlyEnv = z.infer<typeof serverOnlyEnvSchema>
+export type ServerEnv = PublicEnv & ServerOnlyEnv
 
-export const serverEnv: PublicEnv & z.infer<typeof serverOnlyEnvSchema> = {
-  ...publicEnv,
-  ...serverOnlyEnv,
+const serverOnlyEnvCache = new Map<keyof ServerOnlyEnv, ServerOnlyEnv[keyof ServerOnlyEnv]>()
+const loadedServerOnlyEnvKeys = new Set<keyof ServerOnlyEnv>()
+
+function getServerOnlyEnvValue<K extends keyof ServerOnlyEnv>(key: K): ServerOnlyEnv[K] {
+  if (!loadedServerOnlyEnvKeys.has(key)) {
+    const parsedValue = serverOnlyEnvSchema.shape[key].parse(process.env[key]) as ServerOnlyEnv[K]
+    serverOnlyEnvCache.set(key, parsedValue)
+    loadedServerOnlyEnvKeys.add(key)
+  }
+
+  return serverOnlyEnvCache.get(key) as ServerOnlyEnv[K]
 }
 
-export type ServerEnv = typeof serverEnv
+export const serverEnv = {} as ServerEnv
+
+for (const key of Object.keys(publicEnv) as Array<keyof PublicEnv>) {
+  Object.defineProperty(serverEnv, key, {
+    enumerable: true,
+    get() {
+      return publicEnv[key]
+    },
+  })
+}
+
+for (const key of Object.keys(serverOnlyEnvSchema.shape) as Array<keyof ServerOnlyEnv>) {
+  Object.defineProperty(serverEnv, key, {
+    enumerable: true,
+    get() {
+      return getServerOnlyEnvValue(key)
+    },
+  })
+}
