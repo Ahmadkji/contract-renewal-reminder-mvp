@@ -6,6 +6,10 @@ const PUBLIC_PAGE_EXACT_ROUTES = new Set([
   '/',
   '/login',
   '/signup',
+  // Legal pages must stay publicly accessible pre-auth and pre-checkout.
+  '/privacy',
+  '/terms',
+  '/refund-policy',
   '/auth/forgot-password',
   '/auth/reset-password',
   '/verify-email',
