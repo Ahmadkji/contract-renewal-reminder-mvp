@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export interface Profile {
   id: string
@@ -22,6 +22,14 @@ export interface CreateProfileInput {
 export interface UpdateProfileInput {
   full_name?: string
   avatar_url?: string
+  email_notifications?: boolean
+  timezone?: string
+}
+
+export interface BootstrapProfileInput {
+  user_id: string
+  full_name?: string | null
+  avatar_url?: string | null
   email_notifications?: boolean
   timezone?: string
 }
@@ -117,4 +125,37 @@ export async function deleteProfile(userId: string): Promise<boolean> {
   }
   
   return true
+}
+
+/**
+ * Ensure a profile row exists for the user.
+ * Uses the admin client so auth bootstrap can recover missing rows safely.
+ */
+export async function ensureProfileForUser(
+  input: BootstrapProfileInput
+): Promise<Profile> {
+  const admin = createAdminClient()
+
+  const { data, error } = await admin
+    .from('profiles')
+    .upsert(
+      {
+        user_id: input.user_id,
+        full_name: input.full_name ?? null,
+        avatar_url: input.avatar_url ?? null,
+        email_notifications: input.email_notifications ?? true,
+        timezone: input.timezone ?? 'UTC',
+      },
+      {
+        onConflict: 'user_id',
+      }
+    )
+    .select('*')
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to ensure profile: ${error.message}`)
+  }
+
+  return data
 }

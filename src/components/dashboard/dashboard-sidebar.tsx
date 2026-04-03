@@ -8,7 +8,7 @@ import {
   CreditCard,
   Plus,
   Clock,
-  LogOut,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,7 +20,7 @@ interface SidebarProps {
 
 export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarProps) {
   const pathname = usePathname();
-  const { user, logout, loading } = useAuth();
+  const { user, profile, logout, loading } = useAuth();
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
@@ -131,29 +131,29 @@ export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarP
             <div className="flex items-center gap-3 mb-3">
               {/* Avatar with initials */}
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                {user.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              
-              {/* User Info */}
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">
-                  {user.full_name || user.email?.split('@')[0] || 'User'}
+                  {profile?.full_name?.charAt(0).toUpperCase() || user.full_name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
-                <div className="text-xs text-[#a3a3a3] truncate">
-                  {user.email || 'user@example.com'}
+                
+                {/* User Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white truncate">
+                  {profile?.full_name || user.full_name || user.email?.split('@')[0] || 'User'}
+                  </div>
+                  <div className="text-xs text-[#a3a3a3] truncate">
+                    {user.email || 'user@example.com'}
                 </div>
               </div>
             </div>
           )}
           
-          {/* Logout Button */}
+          {/* Reset Button */}
           <div className="mt-2">
             <button
               type="button"
               onClick={() => void logout()}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-all text-amber-300 hover:text-amber-200 hover:bg-amber-500/10 text-sm"
             >
-              <LogOut className="w-4 h-4" />
+              <RefreshCw className="w-4 h-4" />
               Sign out
             </button>
           </div>

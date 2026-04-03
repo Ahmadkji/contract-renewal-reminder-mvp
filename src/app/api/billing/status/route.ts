@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse, connection } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { connection } from 'next/server'
 import { unstable_rethrow } from 'next/navigation'
-import { validateSession, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, validateSession } from '@/lib/supabase/server'
 import { getContractLimit, getOrCreateEntitlementSnapshot } from '@/lib/billing/entitlements'
 import { checkRateLimit, getRateLimitHeaders, getRequestIp } from '@/lib/security/rate-limit'
 import { getRequestIdFromHeaders } from '@/lib/observability/request-id'
@@ -14,6 +15,7 @@ const STATUS_RATE_LIMIT = {
 
 export async function GET(request: NextRequest) {
   const requestId = getRequestIdFromHeaders(request.headers)
+
   try {
     await connection()
 
@@ -33,7 +35,6 @@ export async function GET(request: NextRequest) {
     }
 
     const { user, error: sessionError } = await validateSession()
-
     if (sessionError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -61,7 +62,6 @@ export async function GET(request: NextRequest) {
     }
 
     const snapshot = await getOrCreateEntitlementSnapshot(user.id, 'billing_status_read')
-
     const admin = createAdminClient()
     const { data: latestSubscription, error: subError } = await admin
       .from('billing_subscriptions')

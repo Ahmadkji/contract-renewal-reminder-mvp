@@ -11,6 +11,7 @@ import type { ContractFormData, ContractInput } from "@/types/contract";
 import {
   useCreateContract,
   useDeleteContract,
+  useMvpStoreSubscription,
   useUpdateContract,
 } from "@/hooks/use-contracts";
 import { ContractDetailView } from "@/components/dashboard/contract-detail-view";
@@ -31,6 +32,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { toDateOnlyString } from "@/lib/utils/date-utils";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 // ============================================
@@ -54,7 +56,9 @@ export default function DashboardLayout({
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <DashboardUIProvider>
-          <DashboardInteractiveElements>{children}</DashboardInteractiveElements>
+          <DashboardAuthGate>
+            <DashboardInteractiveElements>{children}</DashboardInteractiveElements>
+          </DashboardAuthGate>
         </DashboardUIProvider>
       </AuthProvider>
     </QueryClientProvider>
@@ -114,6 +118,7 @@ function toContractPayload(data: ContractFormData): ContractInput {
 // Interactive UI Elements with State Management
 // ============================================
 function DashboardInteractiveElements({ children }: { children: React.ReactNode }) {
+  useMvpStoreSubscription();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -216,6 +221,28 @@ function DashboardInteractiveElements({ children }: { children: React.ReactNode 
       />
     </div>
   );
+}
+
+function DashboardAuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-sm text-[#a3a3a3]">
+        Loading dashboard...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] text-sm text-[#a3a3a3]">
+        Redirecting to sign in...
+      </div>
+    );
+  }
+
+  return <>{children}</>;
 }
 
 // ============================================

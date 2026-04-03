@@ -246,6 +246,57 @@ function toStringArray(value: unknown): string[] {
   return value.map((item) => toStringValue(item)).filter(Boolean)
 }
 
+function buildActivityItems(
+  record: Record<string, unknown>,
+  options: { includeReminders?: boolean } = {}
+): ActivityItem[] {
+  const activity: ActivityItem[] = []
+  const contractId = toStringValue(record.id)
+  const contractName = toStringValue(record.name)
+  const createdAt = toStringValue(record.created_at)
+  const updatedAt = toStringValue(record.updated_at)
+
+  if (createdAt) {
+    activity.push({
+      id: `${contractId || 'contract'}-created`,
+      type: 'created',
+      message: `${contractName || 'Contract'} was created.`,
+      date: createdAt,
+    })
+  }
+
+  if (updatedAt && updatedAt !== createdAt) {
+    activity.push({
+      id: `${contractId || 'contract'}-updated`,
+      type: 'updated',
+      message: `${contractName || 'Contract'} was updated.`,
+      date: updatedAt,
+    })
+  }
+
+  if (options.includeReminders) {
+    const reminders = toObjectArray(record.reminders)
+    reminders
+      .filter((reminder) => Boolean(reminder.sent_at))
+      .forEach((reminder, index) => {
+        const sentAt = toStringValue(reminder.sent_at)
+        if (!sentAt) {
+          return
+        }
+
+        const daysBefore = Math.trunc(toFiniteNumber(reminder.days_before, 0))
+        activity.push({
+          id: `${contractId || 'contract'}-reminder-${index}`,
+          type: 'reminder',
+          message: `Reminder sent ${daysBefore > 0 ? `${daysBefore} day${daysBefore === 1 ? '' : 's'}` : 'before renewal'}.`,
+          date: sentAt,
+        })
+      })
+  }
+
+  return activity.sort((left, right) => right.date.localeCompare(left.date))
+}
+
 function parseContractType(value: unknown): ContractWithDetails['type'] {
   const parsed = toStringValue(value).trim().toLowerCase()
   switch (parsed) {
@@ -294,11 +345,9 @@ function transformContract(record: Record<string, unknown>): ContractWithDetails
       .filter((days) => days > 0),
     emailReminders: toBooleanValue(record.email_reminders, false),
     notifyEmails: toStringArray(firstReminder?.notify_emails),
-    // Add missing fields
     createdAt: toStringValue(record.created_at, new Date().toISOString()),
     updatedAt: toStringValue(record.updated_at, new Date().toISOString()),
-    // Add activity field (empty array for now)
-    activity: []
+    activity: buildActivityItems(record, { includeReminders: true }),
   }
 }
 
@@ -327,7 +376,7 @@ function transformContractListRecord(record: Record<string, unknown>): ContractW
     notifyEmails: [],
     createdAt: toStringValue(record.created_at || record.createdAt, new Date().toISOString()),
     updatedAt: toStringValue(record.updated_at || record.updatedAt, new Date().toISOString()),
-    activity: [],
+    activity: buildActivityItems(record),
   }
 }
 
@@ -457,7 +506,8 @@ export async function getContractById(id: string, userId?: string): Promise<Cont
       ),
       reminders (
         days_before,
-        notify_emails
+        notify_emails,
+        sent_at
       )
     `)
     .eq('id', id)

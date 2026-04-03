@@ -23,40 +23,21 @@ function extractEventMetadata(payload: unknown): {
   eventType: string
   eventCreatedAt: string | null
 } {
-  const record =
-    payload && typeof payload === 'object'
-      ? (payload as Record<string, unknown>)
-      : {}
-
+  const record = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
   const eventIdRaw = record.id ?? record.event_id
   const eventTypeRaw = record.type ?? record.event_type
   const eventCreatedAtRaw = record.created_at ?? record.created ?? record.timestamp
 
-  const eventId = typeof eventIdRaw === 'string' && eventIdRaw.trim()
-    ? eventIdRaw.trim()
-    : null
-
-  const eventType = typeof eventTypeRaw === 'string' && eventTypeRaw.trim()
-    ? eventTypeRaw.trim()
-    : 'unknown'
-
-  const eventCreatedAt = typeof eventCreatedAtRaw === 'string' && eventCreatedAtRaw.trim()
-    ? eventCreatedAtRaw
-    : null
-
   return {
-    eventId,
-    eventType,
-    eventCreatedAt,
+    eventId: typeof eventIdRaw === 'string' && eventIdRaw.trim() ? eventIdRaw.trim() : null,
+    eventType: typeof eventTypeRaw === 'string' && eventTypeRaw.trim() ? eventTypeRaw.trim() : 'unknown',
+    eventCreatedAt: typeof eventCreatedAtRaw === 'string' && eventCreatedAtRaw.trim() ? eventCreatedAtRaw : null,
   }
 }
 
 function canFallbackToLegacyIngest(errorMessage: string): boolean {
   const normalized = errorMessage.toLowerCase()
-  return (
-    normalized.includes('ingest_creem_webhook_event') ||
-    normalized.includes('could not find the function')
-  )
+  return normalized.includes('ingest_creem_webhook_event') || normalized.includes('could not find the function')
 }
 
 async function ingestWebhookLegacy(
@@ -71,31 +52,24 @@ async function ingestWebhookLegacy(
     request: NextRequest
   }
 ): Promise<{ duplicate: boolean; accepted: boolean; requeued: boolean; status: string }> {
-  const { error: insertError } = await admin
-    .from('billing_webhook_inbox')
-    .insert({
-      provider: 'creem',
-      provider_event_id: params.eventId,
-      event_type: params.eventType,
-      event_created_at: params.eventCreatedAt,
-      signature_valid: true,
-      payload_sha256: params.payloadSha,
-      payload_json: params.payload,
-      headers_json: {
-        user_agent: params.request.headers.get('user-agent') || null,
-        content_type: params.request.headers.get('content-type') || null,
-        signature_sha256: params.signatureHeader ? sha256Hex(params.signatureHeader) : null,
-      },
-      processing_status: 'pending',
-    })
+  const { error: insertError } = await admin.from('billing_webhook_inbox').insert({
+    provider: 'creem',
+    provider_event_id: params.eventId,
+    event_type: params.eventType,
+    event_created_at: params.eventCreatedAt,
+    signature_valid: true,
+    payload_sha256: params.payloadSha,
+    payload_json: params.payload,
+    headers_json: {
+      user_agent: params.request.headers.get('user-agent') || null,
+      content_type: params.request.headers.get('content-type') || null,
+      signature_sha256: params.signatureHeader ? sha256Hex(params.signatureHeader) : null,
+    },
+    processing_status: 'pending',
+  })
 
   if (!insertError) {
-    return {
-      duplicate: false,
-      accepted: true,
-      requeued: false,
-      status: 'pending',
-    }
+    return { duplicate: false, accepted: true, requeued: false, status: 'pending' }
   }
 
   if (insertError.code !== '23505') {
@@ -125,12 +99,7 @@ async function ingestWebhookLegacy(
       throw new Error(requeueError.message)
     }
 
-    return {
-      duplicate: true,
-      accepted: true,
-      requeued: true,
-      status: 'pending',
-    }
+    return { duplicate: true, accepted: true, requeued: true, status: 'pending' }
   }
 
   return {
@@ -156,27 +125,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const signatureHeader =
-      request.headers.get('creem-signature') ||
-      request.headers.get('x-creem-signature')
+    const signatureHeader = request.headers.get('creem-signature') || request.headers.get('x-creem-signature')
     const rawBody = await request.text()
 
     if (Buffer.byteLength(rawBody, 'utf8') > MAX_WEBHOOK_BODY_BYTES) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Payload too large',
-        },
-        { status: 413 }
-      )
+      return NextResponse.json({ success: false, error: 'Payload too large' }, { status: 413 })
     }
 
-    const signatureCheck = verifyCreemWebhookSignature(
-      rawBody,
-      signatureHeader,
-      env.CREEM_WEBHOOK_SECRET,
-      300
-    )
+    const signatureCheck = verifyCreemWebhookSignature(rawBody, signatureHeader, env.CREEM_WEBHOOK_SECRET, 300)
 
     if (!signatureCheck.valid) {
       console.warn('[Creem Webhook] Signature verification failed', {
@@ -197,24 +153,12 @@ export async function POST(request: NextRequest) {
     try {
       payload = JSON.parse(rawBody)
     } catch {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid JSON payload',
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Invalid JSON payload' }, { status: 400 })
     }
 
     const metadata = extractEventMetadata(payload)
     if (!metadata.eventId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing event ID in webhook payload',
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Missing event ID in webhook payload' }, { status: 400 })
     }
 
     const admin = createAdminClient()

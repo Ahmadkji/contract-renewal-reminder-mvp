@@ -1298,7 +1298,7 @@ function AutomatedRemindersBlock() {
               {[
                 "Email reminders with configurable schedules",
                 "Additional notification recipients supported",
-                "Premium-gated reminder delivery controls",
+                "5 free reminder emails included before upgrade",
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -2051,7 +2051,7 @@ function ComparisonSection() {
     { label: "Renewal date visibility", spreadsheet: { icon: "minus", text: "Varies" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
     { label: "Contract status tracking", spreadsheet: { icon: "minus", text: "Manual" }, crm: { icon: "minus", text: "Generic" }, renewly: { icon: "check", text: "Focused" } },
     { label: "Reminder scheduling", spreadsheet: { icon: "x", text: "Limited" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Included" } },
-    { label: "Email reminders", spreadsheet: { icon: "x", text: "External setup" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Premium" } },
+    { label: "Email reminders", spreadsheet: { icon: "x", text: "External setup" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "5 free emails" } },
     { label: "CSV export", spreadsheet: { icon: "check", text: "Native" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Premium" } },
     { label: "Billing controls", spreadsheet: { icon: "x", text: "N/A" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
   ];
@@ -3081,8 +3081,9 @@ const PRICING_PLANS_NEW = [
       { text: "Contract dashboard", checkColor: "text-emerald-400" },
       { text: "Search and filtering", checkColor: "text-emerald-400" },
       { text: "Contract detail views", checkColor: "text-emerald-400" },
+      { text: "5 reminder emails", checkColor: "text-emerald-400" },
     ],
-    limitation: "Email reminders and CSV export",
+    limitation: "CSV export and additional reminder recipients",
     ctaText: "Start Free",
     ctaHref: "/signup",
     ctaStyle: "bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 hover:text-slate-100",
@@ -3146,8 +3147,8 @@ const PRICING_PLANS_NEW = [
 
 const PRICING_FAQS = [
   { q: "Can I change plans?", a: "Yes. You can switch in billing settings." },
-  { q: "What unlocks on paid plans?", a: "Email reminders and CSV export." },
-  { q: "Is there a free option?", a: "Yes. Free plan includes up to 5 contracts." },
+  { q: "What unlocks on paid plans?", a: "Unlimited reminder emails, additional reminder recipients, and CSV export." },
+  { q: "Is there a free option?", a: "Yes. Free plan includes up to 5 contracts and 5 reminder emails." },
 ] as const;
 
 function PricingSection() {
@@ -3444,7 +3445,7 @@ function FinalCTASection() {
           }`}
           style={{ animationDelay: "250ms" }}
         >
-          Start with the free plan and upgrade to unlock premium reminder and export features.
+          Start with the free plan and upgrade to unlock unlimited reminders, additional recipients, and exports.
         </p>
 
         {/* Form */}

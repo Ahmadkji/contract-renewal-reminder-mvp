@@ -13,6 +13,7 @@ const CHECKOUT_RATE_LIMIT = {
   failClosedWhenUnhealthy: true,
   failClosedRetryAfterSeconds: 60,
 }
+
 const CHECKOUT_SESSION_DEDUPE_TTL_MS = (() => {
   const parsed = Number.parseInt(process.env.CHECKOUT_SESSION_DEDUPE_TTL_MS || '30000', 10)
   if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -22,49 +23,25 @@ const CHECKOUT_SESSION_DEDUPE_TTL_MS = (() => {
 })()
 const CHECKOUT_SESSION_DEDUPE_MAX_ENTRIES = 1_000
 
-const checkoutSessionDedupeCache = new Map<
-  string,
-  {
-    checkoutUrl: string
-    requestId: string
-    expiresAt: number
-  }
->()
+const checkoutSessionDedupeCache = new Map<string, { checkoutUrl: string; requestId: string; expiresAt: number }>()
 
-interface CheckoutRequestBody {
-  planCode?: string
-}
-
-const ALLOWED_CREEM_HOST_SUFFIXES = ['creem.io']
-
-function parseRequestBody(value: unknown): CheckoutRequestBody {
+function parseRequestBody(value: unknown): { planCode?: string } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {}
   }
 
-  return value as CheckoutRequestBody
+  return value as { planCode?: string }
 }
 
 function parseRequestId(request: NextRequest): string {
   const requestId = request.headers.get('x-request-id')?.trim()
-  if (!requestId) {
-    return randomUUID()
-  }
-
-  const normalized = requestId.slice(0, 128)
-  return normalized || randomUUID()
+  return requestId ? requestId.slice(0, 128) || randomUUID() : randomUUID()
 }
 
 function isAllowedCreemUrl(value: string): boolean {
   try {
     const parsed = new URL(value)
-    if (parsed.protocol !== 'https:') {
-      return false
-    }
-
-    return ALLOWED_CREEM_HOST_SUFFIXES.some((suffix) =>
-      parsed.hostname === suffix || parsed.hostname.endsWith(`.${suffix}`)
-    )
+    return parsed.protocol === 'https:' && (parsed.hostname === 'creem.io' || parsed.hostname.endsWith('.creem.io'))
   } catch {
     return false
   }
@@ -112,14 +89,9 @@ function getProviderUnavailableResponse(retryAfterSeconds: number = 30): NextRes
 }
 
 function getCheckoutRateLimitedResponse(
-  rateResult: { allowed?: boolean; retryAfterSeconds: number; remaining: number }
+  rateResult: { retryAfterSeconds: number; remaining: number }
 ): NextResponse {
   const retryAfterSeconds = Math.max(1, Math.min(300, Math.trunc(rateResult.retryAfterSeconds || 30)))
-  const rateLimitHeadersPayload = {
-    allowed: false,
-    remaining: Math.max(0, Math.trunc(rateResult.remaining || 0)),
-    retryAfterSeconds,
-  }
   return NextResponse.json(
     {
       success: false,
@@ -130,7 +102,11 @@ function getCheckoutRateLimitedResponse(
     {
       status: 429,
       headers: getRateLimitHeaders(
-        rateLimitHeadersPayload,
+        {
+          allowed: false,
+          remaining: Math.max(0, Math.trunc(rateResult.remaining || 0)),
+          retryAfterSeconds,
+        },
         CHECKOUT_RATE_LIMIT
       ),
     }
@@ -230,7 +206,6 @@ export async function POST(request: NextRequest) {
     }
 
     const requestId = parseRequestId(request)
-
     const checkoutResponse = await createCreemCheckoutSession({
       product_id: plan.productId,
       request_id: requestId,
@@ -255,18 +230,16 @@ export async function POST(request: NextRequest) {
       requestId,
     })
 
-    await admin
-      .from('billing_audit_logs')
-      .insert({
-        user_id: user.id,
-        actor_type: 'user',
-        actor_id: user.id,
-        action: 'checkout_session_created',
-        request_id: requestId,
-        metadata: {
-          planCode: plan.code,
-        },
-      })
+    await admin.from('billing_audit_logs').insert({
+      user_id: user.id,
+      actor_type: 'user',
+      actor_id: user.id,
+      action: 'checkout_session_created',
+      request_id: requestId,
+      metadata: {
+        planCode: plan.code,
+      },
+    })
 
     return NextResponse.json(
       {
@@ -285,21 +258,12 @@ export async function POST(request: NextRequest) {
 
     const message = error instanceof Error ? error.message : 'Failed to create checkout session'
     if (message.includes('Invalid plan selected')) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: message,
-        },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: message }, { status: 400 })
     }
 
     if (message.includes('Billing product ID is not configured')) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Billing is not configured for this plan yet.',
-        },
+        { success: false, error: 'Billing is not configured for this plan yet.' },
         { status: 500 }
       )
     }

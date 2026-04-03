@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/server';
 import {
   runReminderProcessor,
   type ReminderAdminClient,
-  type ReminderProcessorItemResult,
   type ReminderProcessorOptions as ReminderProcessorCoreOptions,
   type ReminderProcessorResult,
 } from './reminder-processor-core';

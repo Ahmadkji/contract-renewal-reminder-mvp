@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse, connection } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { connection } from 'next/server'
 import { unstable_rethrow } from 'next/navigation'
 import { validateSession } from '@/lib/supabase/server'
 import { getBillingPricingSnapshot } from '@/lib/billing/pricing'
@@ -14,6 +15,7 @@ const PLANS_RATE_LIMIT = {
 
 export async function GET(request: NextRequest) {
   const requestId = getRequestIdFromHeaders(request.headers)
+
   try {
     await connection()
 

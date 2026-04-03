@@ -10,6 +10,7 @@ function sanitizeCsvFormula(value: string): string {
   if (FORMULA_PREFIX_PATTERN.test(value)) {
     return `'${value}`
   }
+
   return value
 }
 
@@ -18,9 +19,7 @@ function toCsvCell(value: unknown): string {
     return ''
   }
 
-  const text = typeof value === 'string'
-    ? sanitizeCsvFormula(value)
-    : String(value)
+  const text = typeof value === 'string' ? sanitizeCsvFormula(value) : String(value)
   if (!/[",\n]/.test(text)) {
     return text
   }

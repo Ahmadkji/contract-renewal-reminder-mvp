@@ -1,7 +1,14 @@
-import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query";
+import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { logger } from "@/lib/logger";
-import type { ContractDetail, ContractInput, ContractSummary } from "@/types/contract";
+import type { ContractDetail, ContractSummary } from "@/types/contract";
+import type { ContractInput } from "@/types/contract";
 
 export interface ContractsResponse {
   contracts: ContractSummary[];
@@ -12,14 +19,33 @@ interface UseContractsOptions {
   search?: string;
 }
 
-function getOriginHeader(): Record<string, string> {
-  if (typeof window === "undefined") {
-    return {};
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  pagination?: {
+    total: number;
+  };
+  error?: string;
+}
+
+async function apiRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<ApiResponse<T>> {
+  const response = await fetch(input, {
+    credentials: "include",
+    cache: "no-store",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.error || `Request failed (${response.status})`);
   }
 
-  return {
-    Origin: window.location.origin,
-  };
+  return payload as ApiResponse<T>;
 }
 
 function sortContractsByEndDate(contracts: ContractSummary[]): ContractSummary[] {
@@ -82,128 +108,9 @@ function patchContractsQueries(
   });
 }
 
-async function fetchContracts(
-  page: number = 1,
-  limit: number = 50,
-  options: UseContractsOptions = {}
-): Promise<ContractsResponse> {
-  const searchParams = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
-
-  const normalizedSearch = options.search?.trim();
-  if (normalizedSearch) {
-    searchParams.set("search", normalizedSearch);
-  }
-
-  const response = await fetch(`/api/contracts?${searchParams.toString()}`, {
-    cache: "no-store",
-    headers: getOriginHeader(),
-  });
-  
-  if (!response.ok) {
-    throw new Error('Failed to fetch contracts');
-  }
-  
-  const result = await response.json();
-  if (!result.success) {
-    throw new Error(result.error || 'Failed to fetch contracts');
-  }
-  
-  return {
-    contracts: result.data,
-    total: result.pagination?.total || 0
-  };
-}
-
-async function fetchContract(id: string): Promise<ContractDetail> {
-  const response = await fetch(`/api/contracts/${id}`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response, "Failed to fetch contract"));
-  }
-
-  const result = await response.json();
-  if (!result.success) {
-    throw new Error(result.error || "Failed to fetch contract");
-  }
-
-  return result.data;
-}
-
-async function getErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const errorData = await response.json();
-    if (typeof errorData?.error === "string") {
-      return errorData.error;
-    }
-  } catch {
-    logger.warn("Failed to parse contract API error response");
-  }
-
-  return fallback;
-}
-
-async function createContract(data: ContractInput): Promise<ContractDetail> {
-  // ✅ Dates already formatted as YYYY-MM-DD strings from the caller
-  const response = await fetch('/api/contracts', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getOriginHeader(),
-    },
-    body: JSON.stringify(data)  // Pass through directly - dates already in correct format
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to create contract'));
-  }
-
-  const result = await response.json();
-  return result.data;
-}
-
-async function updateContract({
-  id,
-  data,
-}: {
-  id: string;
-  data: ContractInput;
-}): Promise<ContractDetail> {
-  const response = await fetch(`/api/contracts/${id}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      ...getOriginHeader(),
-    },
-    body: JSON.stringify(data),
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response, "Failed to update contract"));
-  }
-
-  const result = await response.json();
-  return result.data;
-}
-
-async function deleteContract(id: string): Promise<void> {
-  const response = await fetch(`/api/contracts/${id}`, {
-    method: "DELETE",
-    headers: getOriginHeader(),
-  });
-
-  if (!response.ok) {
-    throw new Error(await getErrorMessage(response, "Failed to delete contract"));
-  }
-}
-
 export function useContracts(
-  page: number = 1,
-  limit: number = 50,
+  page = 1,
+  limit = 50,
   initialData?: ContractsResponse,
   options: UseContractsOptions = {}
 ) {
@@ -211,9 +118,33 @@ export function useContracts(
 
   return useQuery({
     queryKey: ["contracts", page, limit, normalizedSearch],
-    queryFn: () => fetchContracts(page, limit, { search: normalizedSearch }),
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+
+      if (normalizedSearch) {
+        params.set("search", normalizedSearch);
+      }
+
+      const response = await apiRequest<ContractSummary[]>(
+        `/api/contracts?${params.toString()}`
+      );
+
+      return {
+        contracts: response.data ?? [],
+        total: response.pagination?.total ?? (response.data?.length ?? 0),
+      };
+    },
     initialData,
-    staleTime: 1000 * 30, // 30 seconds (reduced from 5 minutes)
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    meta: {
+      subscribeToStore: true,
+    },
   });
 }
 
@@ -222,17 +153,43 @@ export function useContract(contractId?: string, enabled: boolean = true) {
 
   return useQuery({
     queryKey: ["contract", normalizedContractId],
-    queryFn: () => fetchContract(normalizedContractId),
+    queryFn: async () => {
+      const response = await apiRequest<ContractDetail>(
+        `/api/contracts/${normalizedContractId}`
+      );
+
+      if (!response.data) {
+        throw new Error('Contract not found')
+      }
+
+      return response.data;
+    },
     enabled: enabled && Boolean(contractId),
-    staleTime: 1000 * 30,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
   });
+}
+
+export function useMvpStoreSubscription() {
+  useEffect(() => undefined, []);
 }
 
 export function useCreateContract() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: createContract,
+    mutationFn: async (payload: ContractInput) => {
+      const response = await apiRequest<ContractDetail>("/api/contracts", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.data) {
+        throw new Error("Failed to create contract");
+      }
+
+      return response.data;
+    },
     onSuccess: (data) => {
       patchContractsQueries(queryClient, (current, { limit, page }) => {
         const total = current.total + 1;
@@ -255,21 +212,17 @@ export function useCreateContract() {
       });
 
       queryClient.setQueryData<ContractDetail>(["contract", data.id], data);
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
 
-      // ✅ Automatic cache invalidation - invalidates ALL matching queries
-      queryClient.invalidateQueries({ 
-        queryKey: ['contracts']
-      });
-      
       toast({
         title: "Contract created",
         description: `"${data.name}" has been added to your contracts.`,
       });
-      
-      logger.info('Contract created successfully:', data);
+
+      logger.info("Contract created successfully:", data);
     },
     onError: (error: Error) => {
-      logger.error('Failed to create contract:', error);
+      logger.error("Failed to create contract:", error);
     },
   });
 }
@@ -278,7 +231,18 @@ export function useUpdateContract() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: updateContract,
+    mutationFn: async ({ id, data }: { id: string; data: ContractInput }) => {
+      const response = await apiRequest<ContractDetail>(`/api/contracts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+
+      if (!response.data) {
+        throw new Error("Failed to update contract");
+      }
+
+      return response.data;
+    },
     onSuccess: (data) => {
       patchContractsQueries(queryClient, (current, { limit }) => {
         const contracts = current.contracts.map((contract) =>
@@ -292,13 +256,8 @@ export function useUpdateContract() {
       });
 
       queryClient.setQueryData<ContractDetail>(["contract", data.id], data);
-
-      queryClient.invalidateQueries({
-        queryKey: ["contracts"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["contract", data.id],
-      });
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contract", data.id] });
 
       toast({
         title: "Contract updated",
@@ -317,7 +276,13 @@ export function useDeleteContract() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: deleteContract,
+    mutationFn: async (id: string) => {
+      await apiRequest<null>(`/api/contracts/${id}`, {
+        method: "DELETE",
+      });
+
+      return id;
+    },
     onSuccess: (_, deletedId) => {
       patchContractsQueries(queryClient, (current, { limit }) => ({
         ...current,
@@ -331,12 +296,8 @@ export function useDeleteContract() {
         queryKey: ["contract", deletedId],
       });
 
-      queryClient.invalidateQueries({
-        queryKey: ["contracts"],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["contract"],
-      });
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      queryClient.invalidateQueries({ queryKey: ["contract"] });
 
       toast({
         title: "Contract deleted",

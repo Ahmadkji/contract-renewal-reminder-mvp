@@ -19,6 +19,7 @@ export interface ReminderProcessorItemResult {
   contractId: string;
   contractName: string;
   recipients: string[];
+  deliveryTier: 'free_trial' | 'premium';
   status: 'dry_run' | 'sent' | 'skipped' | 'failed';
   error?: string;
 }
@@ -44,6 +45,7 @@ export interface DueReminderRecord {
   days_before: number;
   notify_emails: string[] | null;
   timezone: string | null;
+  delivery_tier: 'free_trial' | 'premium';
 }
 
 type ReminderRpcResponse = PromiseLike<{ data: unknown; error: { message: string } | null }>;
@@ -261,6 +263,25 @@ async function updateClaimedReminder(
   }
 }
 
+async function completeClaimedReminderDelivery(
+  adminClient: ReminderAdminClient,
+  reminderId: string,
+  claimToken: string,
+  deliveryTier: DueReminderRecord['delivery_tier'],
+  sentAtIso: string
+) {
+  const { error } = await adminClient.rpc('complete_email_reminder_delivery', {
+    p_reminder_id: reminderId,
+    p_claim_token: claimToken,
+    p_delivery_tier: deliveryTier,
+    p_sent_at: sentAtIso,
+  });
+
+  if (error) {
+    throw new Error(`Failed to finalize reminder ${reminderId}: ${error.message}`);
+  }
+}
+
 async function releaseStaleClaims(
   adminClient: ReminderAdminClient,
   runAt: Date,
@@ -304,6 +325,7 @@ export async function runReminderProcessor(
       ? {
           p_reference_time: runAt.toISOString(),
           p_limit: limit,
+          p_claim_timeout_seconds: claimTimeoutSeconds,
         }
       : {
           p_reference_time: runAt.toISOString(),
@@ -351,6 +373,7 @@ export async function runReminderProcessor(
         contractId: reminder.contract_id,
         contractName: reminder.contract_name,
         recipients,
+        deliveryTier: reminder.delivery_tier,
         status: 'skipped',
         error: 'No valid recipients resolved for reminder',
       };
@@ -362,6 +385,7 @@ export async function runReminderProcessor(
         contractId: reminder.contract_id,
         contractName: reminder.contract_name,
         recipients,
+        deliveryTier: reminder.delivery_tier,
         status: 'dry_run',
       };
     }
@@ -392,22 +416,26 @@ export async function runReminderProcessor(
         contractId: reminder.contract_id,
         contractName: reminder.contract_name,
         recipients,
+        deliveryTier: reminder.delivery_tier,
         status: 'failed',
         error: sendResult.error || 'Unknown Resend error',
       };
     }
 
-    await updateClaimedReminder(runtime.adminClient, reminder.reminder_id, claimToken, {
-      sent_at: runAt.toISOString(),
-      processing_claimed_at: null,
-      processing_claim_token: null,
-    });
+    await completeClaimedReminderDelivery(
+      runtime.adminClient,
+      reminder.reminder_id,
+      claimToken,
+      reminder.delivery_tier,
+      runAt.toISOString()
+    );
 
     return {
       reminderId: reminder.reminder_id,
       contractId: reminder.contract_id,
       contractName: reminder.contract_name,
       recipients,
+      deliveryTier: reminder.delivery_tier,
       status: 'sent',
     };
   }

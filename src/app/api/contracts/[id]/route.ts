@@ -76,15 +76,11 @@ function mapContractUpdateError(error: unknown): {
   }
 }
 
-/**
- * GET /api/contracts/[id] - Fetch single contract
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // CSRF Protection
     if (!validateOrigin(request)) {
       logInvalidOriginAttempt(request, 'GET /api/contracts/[id]')
       return getOriginErrorResponse()
@@ -95,10 +91,9 @@ export async function GET(
     if (!ipRate.allowed) {
       return getContractsRateLimitedResponse(ipRate, CONTRACT_DETAIL_RATE_LIMIT)
     }
-    
-    // Validate session using enhanced validation
+
     const { user, error: sessionError } = await validateSession()
-    
+
     if (sessionError) {
       console.error('[GET /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
@@ -106,7 +101,7 @@ export async function GET(
         { status: 401 }
       )
     }
-    
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized - please sign in' },
@@ -118,27 +113,17 @@ export async function GET(
     if (!userRate.allowed) {
       return getContractsRateLimitedResponse(userRate, CONTRACT_DETAIL_RATE_LIMIT)
     }
-    
+
     const { id } = await params
-    
-    let contract
-    try {
-      contract = await getContractById(id, user.id)
-    } catch (dbError) {
-      console.error('[GET /api/contracts/[id]] Database error:', dbError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to fetch contract from database' },
-        { status: 500 }
-      )
-    }
-    
+    const contract = await getContractById(id, user.id)
+
     if (!contract) {
       return NextResponse.json(
         { success: false, error: 'Contract not found or access denied' },
         { status: 404 }
       )
     }
-    
+
     return NextResponse.json(
       { success: true, data: contract },
       {
@@ -159,15 +144,11 @@ export async function GET(
   }
 }
 
-/**
- * PATCH /api/contracts/[id] - Update contract
- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // CSRF Protection
     if (!validateOrigin(request)) {
       logInvalidOriginAttempt(request, 'PATCH /api/contracts/[id]')
       return getOriginErrorResponse()
@@ -178,10 +159,9 @@ export async function PATCH(
     if (!ipRate.allowed) {
       return getContractsRateLimitedResponse(ipRate, CONTRACT_MUTATION_RATE_LIMIT)
     }
-    
-    // Validate session using enhanced validation
+
     const { user, error: sessionError } = await validateSession()
-    
+
     if (sessionError) {
       console.error('[PATCH /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
@@ -189,7 +169,7 @@ export async function PATCH(
         { status: 401 }
       )
     }
-    
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized - please sign in' },
@@ -204,42 +184,43 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    
-    // Validate with Zod schema
     const validationResult = validateContractInput(body)
     if (!validationResult.success) {
       return NextResponse.json(
         {
           success: false,
           error: 'Validation failed',
-          details: validationResult.error.flatten().fieldErrors
+          details: validationResult.error.flatten().fieldErrors,
         },
         { status: 400 }
       )
     }
-    
-    const data = validationResult.data
 
+    const data = validationResult.data
     let contract
     try {
-      contract = await updateContract(id, {
-        name: data.name,
-        vendor: data.vendor,
-        type: data.type,
-        startDate: data.startDate,
-        endDate: data.endDate,
-        value: data.value,
-        currency: data.currency,
-        autoRenew: data.autoRenew,
-        renewalTerms: data.renewalTerms,
-        notes: data.notes,
-        tags: data.tags,
-        vendorContact: data.vendorContact,
-        vendorEmail: data.vendorEmail,
-        reminderDays: data.reminderDays,
-        emailReminders: data.emailReminders,
-        notifyEmails: data.notifyEmails
-      }, user.id)
+      contract = await updateContract(
+        id,
+        {
+          name: data.name,
+          vendor: data.vendor,
+          type: data.type,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          value: data.value,
+          currency: data.currency,
+          autoRenew: data.autoRenew,
+          renewalTerms: data.renewalTerms,
+          notes: data.notes,
+          tags: data.tags,
+          vendorContact: data.vendorContact,
+          vendorEmail: data.vendorEmail,
+          reminderDays: data.reminderDays,
+          emailReminders: data.emailReminders,
+          notifyEmails: data.notifyEmails,
+        },
+        user.id
+      )
     } catch (dbError) {
       console.error('[PATCH /api/contracts/[id]] Database error (update):', dbError)
       const mappedError = mapContractUpdateError(dbError)
@@ -275,15 +256,11 @@ export async function PATCH(
   }
 }
 
-/**
- * DELETE /api/contracts/[id] - Delete contract
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // CSRF Protection
     if (!validateOrigin(request)) {
       logInvalidOriginAttempt(request, 'DELETE /api/contracts/[id]')
       return getOriginErrorResponse()
@@ -294,10 +271,9 @@ export async function DELETE(
     if (!ipRate.allowed) {
       return getContractsRateLimitedResponse(ipRate, CONTRACT_MUTATION_RATE_LIMIT)
     }
-    
-    // Validate session using enhanced validation
+
     const { user, error: sessionError } = await validateSession()
-    
+
     if (sessionError) {
       console.error('[DELETE /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
@@ -305,7 +281,7 @@ export async function DELETE(
         { status: 401 }
       )
     }
-    
+
     if (!user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized - please sign in' },
@@ -319,17 +295,7 @@ export async function DELETE(
     }
 
     const { id } = await params
-    
-    let deleted = false
-    try {
-      deleted = await deleteContract(id, user.id)
-    } catch (dbError) {
-      console.error('[DELETE /api/contracts/[id]] Database error (delete):', dbError)
-      return NextResponse.json(
-        { success: false, error: 'Failed to delete contract from database' },
-        { status: 500 }
-      )
-    }
+    const deleted = await deleteContract(id, user.id)
 
     if (!deleted) {
       return NextResponse.json(

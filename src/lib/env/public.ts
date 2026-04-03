@@ -39,12 +39,21 @@ function resolvePublicSupabaseAnonKey(): string | undefined {
 }
 
 function resolveAppUrl(): string | undefined {
-  // Prefer the explicit public URL, but fall back to Vercel's production host when needed.
-  return toAbsoluteUrl(
+  const explicitUrl =
     readEnv('NEXT_PUBLIC_APP_URL') ??
-      readEnv('VERCEL_PROJECT_PRODUCTION_URL') ??
-      readEnv('VERCEL_URL')
-  )
+    readEnv('VERCEL_PROJECT_PRODUCTION_URL') ??
+    readEnv('VERCEL_URL')
+
+  if (explicitUrl) {
+    return toAbsoluteUrl(explicitUrl)
+  }
+
+  if (typeof window !== 'undefined' && window.location.origin) {
+    return window.location.origin
+  }
+
+  const port = readEnv('PORT') ?? '3000'
+  return `http://localhost:${port}`
 }
 
 let cachedPublicSupabaseEnv: z.infer<typeof publicSupabaseEnvSchema> | undefined

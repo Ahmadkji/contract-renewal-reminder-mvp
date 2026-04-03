@@ -1,45 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import {
-  ArrowUpRight,
-  CheckCircle2,
-  Crown,
-  Loader2,
-  RefreshCw,
-  Sparkles,
-  XCircle,
-} from "lucide-react";
-import { toast } from "@/hooks/use-toast";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Crown, RefreshCw, Sparkles } from "lucide-react";
 
 type BillingPlanCode = "monthly" | "yearly";
-type BillingAction = BillingPlanCode | "portal";
-type BillingPricingSource = "live" | "fallback";
 
-interface BillingStatusData {
-  planCode: BillingPlanCode | null;
-  subscriptionStatus: string;
-  isPremium: boolean;
-  features: {
-    emailReminders: boolean;
-    csvExport: boolean;
-  };
-  usage: {
-    contractsLimit: number | null;
-  };
-  effectiveTo: string | null;
-  currentPeriodEndDate: string | null;
-  currentPeriodStartDate: string | null;
-  cancelAtPeriodEnd: boolean;
-  canceledAt: string | null;
-  trialEnd: string | null;
-  computedAt: string | null;
-}
-
-interface BillingPricingPlan {
+interface BillingPlan {
   planCode: BillingPlanCode;
   displayName: string;
   priceCents: number;
@@ -50,704 +16,377 @@ interface BillingPricingPlan {
   yearlySavingsPercent: number;
 }
 
-interface BillingPricingData {
-  plans: BillingPricingPlan[];
+interface BillingPricingSnapshot {
+  plans: BillingPlan[];
   currency: string;
-  source: BillingPricingSource;
+  source: "live" | "fallback";
   stale: boolean;
   generatedAt: string;
 }
 
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
-interface CheckoutResponse {
-  checkoutUrl?: string;
-}
-
-interface PortalResponse {
-  portalUrl?: string;
-}
-
-function createLocalFallbackPricing(): BillingPricingData {
-  return {
-    plans: [
-      {
-        planCode: "monthly",
-        displayName: "Monthly",
-        priceCents: 1900,
-        currency: "USD",
-        billingPeriod: "every-month",
-        productId: "",
-        monthlyEquivalentCents: 1900,
-        yearlySavingsPercent: 0,
-      },
-      {
-        planCode: "yearly",
-        displayName: "Yearly",
-        priceCents: 19000,
-        currency: "USD",
-        billingPeriod: "every-year",
-        productId: "",
-        monthlyEquivalentCents: 1583,
-        yearlySavingsPercent: 17,
-      },
-    ],
-    currency: "USD",
-    source: "fallback",
-    stale: true,
-    generatedAt: new Date().toISOString(),
+interface BillingStatusResponse {
+  planCode: BillingPlanCode | null;
+  subscriptionStatus: string;
+  isPremium: boolean;
+  features: {
+    emailReminders: boolean;
+    csvExport: boolean;
   };
-}
-
-function formatPlan(planCode: BillingPlanCode | null, isPremium: boolean): string {
-  if (!isPremium || !planCode) {
-    return "Free";
-  }
-
-  return planCode === "yearly" ? "Yearly" : "Monthly";
-}
-
-function formatStatus(status: string): string {
-  if (!status) return "None";
-  return status
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "N/A";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return parsed.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  usage: {
+    contractsLimit: number | null;
+  };
+  currentPeriodEndDate: string | null;
+  currentPeriodStartDate: string | null;
+  cancelAtPeriodEnd: boolean;
+  canceledAt: string | null;
+  trialEnd: string | null;
+  computedAt: string;
 }
 
 function formatCurrency(cents: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(cents / 100);
 }
 
-function formatPeriodLabel(billingPeriod: string): string {
-  if (billingPeriod.includes("month")) return "/month";
-  if (billingPeriod.includes("year")) return "/year";
-  return "/billing cycle";
-}
-
-function formatContractLimit(limit: number | null | undefined): string {
-  if (limit === null || limit === undefined) {
-    return "Unlimited contracts";
+function formatPeriodEnd(value: string | null): string {
+  if (!value) {
+    return "No renewal date";
   }
 
-  return `Up to ${limit} contracts`;
+  return new Date(value).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-function isActiveSubscriptionStatus(status?: string): boolean {
-  if (!status) return false;
-  return ["active", "trialing", "past_due", "unpaid"].includes(status);
-}
+async function fetchJson<T>(input: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(input, {
+    credentials: "include",
+    cache: "no-store",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+  });
 
-function normalizeRetryAfterSeconds(value: unknown, fallback: number = 30): number {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number.parseInt(value, 10)
-        : NaN;
-
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.error || `Request failed (${response.status})`);
   }
 
-  return Math.max(1, Math.min(300, Math.trunc(parsed)));
+  return payload.data as T;
 }
 
 export function BillingPageClient() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const billingParam = searchParams.get("billing");
-  const fallbackPricing = useMemo(() => createLocalFallbackPricing(), []);
-
-  const [status, setStatus] = useState<BillingStatusData | null>(null);
-  const [pricing, setPricing] = useState<BillingPricingData | null>(null);
+  const [pricing, setPricing] = useState<BillingPricingSnapshot | null>(null);
+  const [status, setStatus] = useState<BillingStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pricingError, setPricingError] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<BillingAction | null>(null);
-  const [checkoutCooldownUntilMs, setCheckoutCooldownUntilMs] = useState(0);
-  const [checkoutCooldownNowMs, setCheckoutCooldownNowMs] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<"checkout" | "portal" | null>(null);
 
-  const loadBillingData = useCallback(
-    async ({ silent }: { silent?: boolean } = {}) => {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        const [nextPricing, nextStatus] = await Promise.all([
+          fetchJson<BillingPricingSnapshot>("/api/billing/plans"),
+          fetchJson<BillingStatusResponse>("/api/billing/status"),
+        ]);
+
+        if (!mounted) {
+          return;
+        }
+
+        setPricing(nextPricing);
+        setStatus(nextStatus);
+      } catch (error) {
+        if (!mounted) {
+          return;
+        }
+        setActionError(error instanceof Error ? error.message : "Failed to load billing");
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
+    };
 
-      const statusPromise = fetch("/api/billing/status", {
-        method: "GET",
-        cache: "no-store",
-      });
-      const pricingPromise = fetch("/api/billing/plans", {
-        method: "GET",
-        cache: "no-store",
-      });
+    load().catch(() => undefined);
 
-      const [statusResult, pricingResult] = await Promise.allSettled([
-        statusPromise,
-        pricingPromise,
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const refreshStatus = async () => {
+    setRefreshing(true);
+    setActionError(null);
+    try {
+      const [nextPricing, nextStatus] = await Promise.all([
+        fetchJson<BillingPricingSnapshot>("/api/billing/plans"),
+        fetchJson<BillingStatusResponse>("/api/billing/status"),
       ]);
-
-      let statusLoaded = false;
-
-      if (statusResult.status === "fulfilled") {
-        try {
-          const payload = (await statusResult.value.json().catch(() => ({}))) as ApiResponse<BillingStatusData>;
-          if (!statusResult.value.ok || !payload.success || !payload.data) {
-            throw new Error(payload.error || "Failed to load billing status.");
-          }
-          setStatus(payload.data);
-          statusLoaded = true;
-        } catch (statusError) {
-          const message =
-            statusError instanceof Error ? statusError.message : "Failed to load billing status.";
-          setError(message);
-          toast({
-            title: "Unable to load billing status",
-            description: message,
-            variant: "destructive",
-          });
-        }
-      } else {
-        setError("Failed to load billing status.");
-        toast({
-          title: "Unable to load billing status",
-          description: "Please refresh and try again.",
-          variant: "destructive",
-        });
-      }
-
-      if (pricingResult.status === "fulfilled") {
-        try {
-          const payload = (await pricingResult.value.json().catch(() => ({}))) as ApiResponse<BillingPricingData>;
-          if (!pricingResult.value.ok || !payload.success || !payload.data) {
-            throw new Error(payload.error || "Failed to load pricing.");
-          }
-          setPricing(payload.data);
-          setPricingError(null);
-        } catch (planError) {
-          const message = planError instanceof Error ? planError.message : "Failed to load pricing.";
-          setPricing(fallbackPricing);
-          setPricingError(message);
-          toast({
-            title: "Using cached pricing",
-            description: "Live pricing is temporarily unavailable.",
-          });
-        }
-      } else {
-        setPricing(fallbackPricing);
-        setPricingError("Failed to load pricing.");
-        toast({
-          title: "Using cached pricing",
-          description: "Live pricing is temporarily unavailable.",
-        });
-      }
-
-      if (statusLoaded) {
-        setError(null);
-      }
-
-      setLoading(false);
+      setPricing(nextPricing);
+      setStatus(nextStatus);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to refresh billing");
+    } finally {
       setRefreshing(false);
-    },
-    [fallbackPricing]
-  );
-
-  useEffect(() => {
-    void loadBillingData();
-  }, [loadBillingData]);
-
-  useEffect(() => {
-    if (!billingParam) {
-      return;
     }
-
-    if (billingParam === "checkout_success") {
-      toast({
-        title: "Checkout completed",
-        description: "We are refreshing your billing status now.",
-      });
-    } else if (billingParam === "checkout_canceled") {
-      toast({
-        title: "Checkout canceled",
-        description: "No worries, your plan is unchanged.",
-      });
-    } else if (billingParam === "portal_return") {
-      toast({
-        title: "Returned from billing portal",
-        description: "Your subscription details have been refreshed.",
-      });
-    }
-
-    router.replace("/dashboard/billing");
-    void loadBillingData({ silent: true });
-  }, [billingParam, loadBillingData, router]);
-
-  useEffect(() => {
-    if (checkoutCooldownUntilMs <= Date.now()) {
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setCheckoutCooldownNowMs(Date.now());
-      if (Date.now() >= checkoutCooldownUntilMs) {
-        clearInterval(timer);
-      }
-    }, 250);
-
-    return () => clearInterval(timer);
-  }, [checkoutCooldownUntilMs]);
-
-  const checkoutCooldownSeconds = useMemo(() => {
-    if (checkoutCooldownUntilMs <= checkoutCooldownNowMs) {
-      return 0;
-    }
-    return Math.max(
-      0,
-      Math.ceil((checkoutCooldownUntilMs - checkoutCooldownNowMs) / 1000)
-    );
-  }, [checkoutCooldownNowMs, checkoutCooldownUntilMs]);
+  };
 
   const handleCheckout = async (planCode: BillingPlanCode) => {
-    if (pendingAction || checkoutCooldownSeconds > 0) {
-      return;
-    }
+    setActiveAction("checkout");
+    setActionError(null);
 
-    setPendingAction(planCode);
     try {
-      const response = await fetch("/api/billing/checkout", {
+      const response = await fetchJson<{ checkoutUrl: string }>("/api/billing/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Origin: window.location.origin,
-        },
         body: JSON.stringify({ planCode }),
       });
 
-      const payload = (await response.json().catch(() => ({}))) as ApiResponse<CheckoutResponse> & {
-        code?: string;
-        retryAfterSeconds?: number;
-      };
-
-      if (!response.ok) {
-        const isCheckoutRateLimited =
-          response.status === 429 || payload.code === "CHECKOUT_RATE_LIMITED";
-
-        if (isCheckoutRateLimited) {
-          const retryAfterSeconds = normalizeRetryAfterSeconds(
-            payload.retryAfterSeconds ?? response.headers.get("retry-after"),
-            30
-          );
-          const now = Date.now();
-          setCheckoutCooldownNowMs(now);
-          setCheckoutCooldownUntilMs(now + retryAfterSeconds * 1000);
-          toast({
-            title: "Checkout temporarily limited",
-            description:
-              payload.error || `Please wait ${retryAfterSeconds}s before trying again.`,
-          });
-          return;
-        }
-      }
-
-      if (!response.ok || !payload.success || !payload.data?.checkoutUrl) {
-        throw new Error(payload.error || "Failed to start checkout.");
-      }
-
-      window.location.assign(payload.data.checkoutUrl);
-    } catch (checkoutError) {
-      const message =
-        checkoutError instanceof Error ? checkoutError.message : "Failed to start checkout.";
-      toast({
-        title: "Checkout failed",
-        description: message,
-        variant: "destructive",
-      });
+      window.location.href = response.checkoutUrl;
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to start checkout");
     } finally {
-      setPendingAction(null);
+      setActiveAction(null);
     }
   };
 
-  const handleOpenPortal = async () => {
-    if (pendingAction) {
-      return;
-    }
+  const handlePortal = async () => {
+    setActiveAction("portal");
+    setActionError(null);
 
-    setPendingAction("portal");
     try {
-      const response = await fetch("/api/billing/portal", {
+      const response = await fetchJson<{ portalUrl: string }>("/api/billing/portal", {
         method: "POST",
-        headers: {
-          Origin: window.location.origin,
-        },
       });
 
-      const payload = (await response.json().catch(() => ({}))) as ApiResponse<PortalResponse>;
-      if (!response.ok || !payload.success || !payload.data?.portalUrl) {
-        throw new Error(payload.error || "Failed to open billing portal.");
-      }
-
-      window.location.assign(payload.data.portalUrl);
-    } catch (portalError) {
-      const message =
-        portalError instanceof Error ? portalError.message : "Failed to open billing portal.";
-      toast({
-        title: "Billing portal unavailable",
-        description: message,
-        variant: "destructive",
-      });
-      setPendingAction(null);
+      window.location.href = response.portalUrl;
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Failed to open billing portal");
+    } finally {
+      setActiveAction(null);
     }
   };
 
-  if (loading && !status) {
-    return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="h-52 bg-[#141414] border border-white/[0.08] rounded-xl flex items-center justify-center">
-          <Loader2 className="w-6 h-6 text-[#a3a3a3] animate-spin" />
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !status) {
-    return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="bg-[#141414] border border-red-500/30 rounded-xl p-6">
-          <div className="flex items-center gap-2 text-red-300 mb-2">
-            <XCircle className="w-5 h-5" />
-            <h1 className="text-lg font-semibold">Unable to load billing</h1>
-          </div>
-          <p className="text-sm text-[#d4d4d4] mb-4">{error}</p>
-          <button
-            onClick={() => void loadBillingData()}
-            className="h-10 px-4 text-sm font-medium rounded-lg bg-cyan-600 text-white hover:bg-cyan-500 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const pricingData = pricing ?? fallbackPricing;
-  const monthlyPlan =
-    pricingData.plans.find((plan) => plan.planCode === "monthly") ?? fallbackPricing.plans[0];
-  const yearlyPlan =
-    pricingData.plans.find((plan) => plan.planCode === "yearly") ?? fallbackPricing.plans[1];
-  const yearlySavings = yearlyPlan.yearlySavingsPercent;
-  const hasPendingAction = pendingAction !== null;
-  const hasCheckoutCooldown = checkoutCooldownSeconds > 0;
-  const subscriptionStatus = formatStatus(status?.subscriptionStatus || "none");
-  const activePlanLabel = formatPlan(status?.planCode ?? null, status?.isPremium ?? false);
-  const isSubscriptionActive = isActiveSubscriptionStatus(status?.subscriptionStatus);
-  const freePlanActive = !status?.isPremium || !isSubscriptionActive;
-  const monthlyPlanActive = status?.isPremium && status?.planCode === "monthly" && isSubscriptionActive;
-  const yearlyPlanActive = status?.isPremium && status?.planCode === "yearly" && isSubscriptionActive;
-
-  const statusTone = (() => {
-    const value = status?.subscriptionStatus || "none";
-    if (value === "active" || value === "trialing") {
-      return "bg-emerald-500/15 text-emerald-300 border-emerald-400/30";
-    }
-    if (value === "past_due" || value === "unpaid") {
-      return "bg-amber-500/15 text-amber-300 border-amber-400/30";
-    }
-    if (value === "canceled" || value === "expired") {
-      return "bg-red-500/15 text-red-300 border-red-400/30";
-    }
-    return "bg-white/10 text-[#d4d4d4] border-white/15";
-  })();
+  const currentPlanLabel = status?.isPremium
+    ? status.planCode === "yearly"
+      ? "Yearly"
+      : "Monthly"
+    : "Free";
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">Billing</h1>
-          <p className="text-sm text-[#a3a3a3] mt-1">
-            Manage your plan, pricing, and premium subscription settings.
-          </p>
-        </div>
-
-        <button
-          onClick={() => void loadBillingData({ silent: true })}
-          disabled={refreshing}
-          className="h-9 px-3 inline-flex items-center gap-2 text-sm rounded-lg border border-white/10 text-[#d4d4d4] hover:text-white hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      <section className="bg-[#141414] border border-white/[0.08] rounded-2xl p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-xl font-semibold text-white">Plans & Pricing</h2>
-            <p className="text-sm text-[#a3a3a3] mt-1">
-              Professional plans with live pricing and instant checkout.
+    <div className="max-w-6xl mx-auto space-y-6">
+      <section className="rounded-2xl border border-white/[0.08] bg-[#141414] p-6 sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-medium text-cyan-300">
+              <Sparkles className="h-3.5 w-3.5" />
+              Live billing
+            </div>
+            <h1 className="mt-4 text-2xl font-semibold text-white sm:text-3xl">
+              Manage your Creem subscription
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-[#a3a3a3]">
+              Checkout, subscription status, and customer portal access are backed by Supabase and Creem.
             </p>
           </div>
 
-          <button
-            onClick={() => void handleOpenPortal()}
-            disabled={hasPendingAction}
-            className="h-10 px-4 rounded-lg border border-white/15 text-[#d4d4d4] text-sm hover:text-white hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
-          >
-            {pendingAction === "portal" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <ArrowUpRight className="w-4 h-4" />
-            )}
-            Manage Billing
-          </button>
-        </div>
-
-        {(pricingData.stale || pricingError) && (
-          <div className="mb-5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-            Pricing data may be delayed. Showing cached values while live pricing refreshes.
+          <div className="rounded-2xl border border-white/[0.08] bg-black/30 p-5 lg:min-w-72">
+            <div className="flex items-center gap-2 text-sm text-[#a3a3a3]">
+              <Crown className="h-4 w-4 text-cyan-400" />
+              Current plan
+            </div>
+            <div className="mt-3 text-2xl font-semibold text-white">{currentPlanLabel}</div>
+            <p className="mt-2 text-sm text-[#a3a3a3]">
+              Status: {status?.subscriptionStatus || "unknown"}
+            </p>
+            <p className="mt-1 text-sm text-[#a3a3a3]">
+              Period ends: {formatPeriodEnd(status?.currentPeriodEndDate || null)}
+            </p>
           </div>
-        )}
-        <div className="mb-5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
-          Payments are processed by Creem as merchant of record. By upgrading, you agree to{" "}
-          <Link href="/terms" className="underline underline-offset-2 hover:text-cyan-200">
-            Terms of Service
-          </Link>{" "}
-          and{" "}
-          <Link href="/refund-policy" className="underline underline-offset-2 hover:text-cyan-200">
-            Refund Policy
-          </Link>
-          . Support:{" "}
-          <a href={SUPPORT_MAILTO} className="underline underline-offset-2 hover:text-cyan-200">
-            {SUPPORT_EMAIL}
-          </a>
-          .
-        </div>
-        {hasCheckoutCooldown && (
-          <div className="mb-5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-200">
-            Checkout temporarily limited. Try again in {checkoutCooldownSeconds}s.
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <article
-            className={`rounded-xl border p-5 ${
-              freePlanActive
-                ? "border-cyan-400/40 bg-cyan-500/10"
-                : "border-white/10 bg-black/20"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white">Free</h3>
-              {freePlanActive && (
-                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                  Current
-                </span>
-              )}
-            </div>
-            <div className="mb-4">
-              <p className="text-3xl font-semibold text-white">$0</p>
-              <p className="text-xs text-[#a3a3a3] mt-1">Forever</p>
-            </div>
-            <ul className="space-y-2 text-sm text-[#d4d4d4]">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                {formatContractLimit(status?.usage.contractsLimit)}
-              </li>
-              <li className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-300" />
-                CSV export
-              </li>
-              <li className="flex items-center gap-2">
-                <XCircle className="w-4 h-4 text-red-300" />
-                Email reminders
-              </li>
-            </ul>
-          </article>
-
-          <article
-            className={`rounded-xl border p-5 ${
-              monthlyPlanActive
-                ? "border-cyan-400/40 bg-cyan-500/10"
-                : "border-white/10 bg-black/20"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white">{monthlyPlan.displayName}</h3>
-              {monthlyPlanActive && (
-                <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                  Current
-                </span>
-              )}
-            </div>
-            <div className="mb-4">
-              <p className="text-3xl font-semibold text-white">
-                {formatCurrency(monthlyPlan.priceCents, monthlyPlan.currency)}
-              </p>
-              <p className="text-xs text-[#a3a3a3] mt-1">{formatPeriodLabel(monthlyPlan.billingPeriod)}</p>
-            </div>
-            <ul className="space-y-2 text-sm text-[#d4d4d4] mb-4">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                Unlimited contracts
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                CSV export
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                Email reminders
-              </li>
-            </ul>
-            <button
-              onClick={() => void handleCheckout("monthly")}
-              disabled={hasPendingAction || hasCheckoutCooldown || monthlyPlanActive}
-              className="w-full h-10 px-4 rounded-lg bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
-            >
-              {pendingAction === "monthly" && <Loader2 className="w-4 h-4 animate-spin" />}
-              {monthlyPlanActive ? "Current Plan" : "Upgrade Monthly"}
-            </button>
-          </article>
-
-          <article
-            className={`rounded-xl border p-5 relative ${
-              yearlyPlanActive
-                ? "border-cyan-400/40 bg-cyan-500/10"
-                : "border-[#3b82f6]/40 bg-blue-500/10"
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-white">{yearlyPlan.displayName}</h3>
-              <div className="flex items-center gap-2">
-                {yearlySavings > 0 && (
-                  <span className="text-xs px-2 py-1 rounded-full bg-blue-500/20 text-blue-200 border border-blue-400/40 inline-flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    Most Popular
-                  </span>
-                )}
-                {yearlyPlanActive && (
-                  <span className="text-xs px-2 py-1 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                    Current
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="mb-4">
-              <p className="text-3xl font-semibold text-white">
-                {formatCurrency(yearlyPlan.priceCents, yearlyPlan.currency)}
-              </p>
-              <p className="text-xs text-[#a3a3a3] mt-1">{formatPeriodLabel(yearlyPlan.billingPeriod)}</p>
-              <p className="text-xs text-blue-200 mt-2">
-                Equivalent to {formatCurrency(yearlyPlan.monthlyEquivalentCents, yearlyPlan.currency)}/month
-              </p>
-              {yearlySavings > 0 && (
-                <p className="text-xs text-emerald-200 mt-1">Save {yearlySavings}% vs monthly billing</p>
-              )}
-            </div>
-            <ul className="space-y-2 text-sm text-[#d4d4d4] mb-4">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                Unlimited contracts
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                CSV export
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                Email reminders
-              </li>
-            </ul>
-            <button
-              onClick={() => void handleCheckout("yearly")}
-              disabled={hasPendingAction || hasCheckoutCooldown || yearlyPlanActive}
-              className="w-full h-10 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
-            >
-              {pendingAction === "yearly" && <Loader2 className="w-4 h-4 animate-spin" />}
-              {yearlyPlanActive ? "Current Plan" : "Upgrade Yearly"}
-            </button>
-          </article>
         </div>
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-5">
-          <p className="text-xs uppercase tracking-wide text-[#a3a3a3] mb-2">Current Plan</p>
+      {actionError ? (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {actionError}
+        </div>
+      ) : null}
+
+      <section className="grid gap-4 lg:grid-cols-3">
+        <PlanCard
+          title="Free"
+          price="$0"
+          description="Track contracts and upgrade when you need reminder emails or CSV export."
+          active={!status?.isPremium}
+          ctaLabel="Current plan"
+          onClick={() => undefined}
+          disabled
+          bullets={[
+            "RLS-protected contract storage in Supabase",
+            "Reminder limits enforced at the database layer",
+            "No billing card required",
+          ]}
+        />
+
+        {(pricing?.plans || []).map((plan) => (
+          <PlanCard
+            key={plan.planCode}
+            title={plan.displayName}
+            price={formatCurrency(plan.priceCents, plan.currency)}
+            description={`Powered by live Creem product data for the ${plan.displayName.toLowerCase()} plan.`}
+            active={status?.planCode === plan.planCode}
+            ctaLabel={
+              status?.planCode === plan.planCode ? "Current plan" : `Checkout ${plan.displayName}`
+            }
+            onClick={() => {
+              if (status?.planCode !== plan.planCode) {
+                void handleCheckout(plan.planCode);
+              }
+            }}
+            disabled={activeAction === "checkout" || loading || status?.planCode === plan.planCode}
+            bullets={[
+              `Renews ${plan.billingPeriod.replace("every-", "")}`,
+              plan.yearlySavingsPercent > 0
+                ? `${plan.yearlySavingsPercent}% savings vs monthly`
+                : "Baseline premium configuration",
+              "Portal and webhook reconciliation stay server-side",
+            ]}
+          />
+        ))}
+      </section>
+
+      <section className="rounded-2xl border border-white/[0.08] bg-[#141414] p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            <RefreshCw className="h-4 w-4 text-cyan-400" />
+            Subscription details
+          </div>
+
           <div className="flex items-center gap-2">
-            <Crown className="w-5 h-5 text-cyan-400" />
-            <p className="text-xl font-semibold text-white">{activePlanLabel}</p>
+            <button
+              type="button"
+              onClick={refreshStatus}
+              disabled={refreshing}
+              className="inline-flex h-10 items-center justify-center rounded-xl border border-white/[0.08] bg-black/20 px-4 text-sm text-white transition-colors hover:bg-white/5 disabled:opacity-50"
+            >
+              {refreshing ? "Refreshing..." : "Refresh"}
+            </button>
+            <button
+              type="button"
+              onClick={handlePortal}
+              disabled={activeAction === "portal" || !status?.isPremium}
+              className="inline-flex h-10 items-center justify-center rounded-xl bg-cyan-600 px-4 text-sm font-medium text-white transition-colors hover:bg-cyan-500 disabled:opacity-50"
+            >
+              {activeAction === "portal" ? "Opening..." : "Open portal"}
+            </button>
           </div>
-          <p className="text-xs text-[#a3a3a3] mt-3">
-            {formatContractLimit(status?.usage.contractsLimit)}
-          </p>
         </div>
 
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-5">
-          <p className="text-xs uppercase tracking-wide text-[#a3a3a3] mb-2">Subscription Status</p>
-          <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs border ${statusTone}`}>
-            {subscriptionStatus}
-          </span>
-          <p className="text-xs text-[#a3a3a3] mt-3">
-            Current period end: {formatDate(status?.currentPeriodEndDate || null)}
-          </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {[
+            {
+              label: "Feature gates",
+              value: status?.isPremium ? "Premium enabled" : "Free tier limits active",
+            },
+            {
+              label: "CSV export",
+              value: status?.features.csvExport ? "Enabled" : "Disabled",
+            },
+            {
+              label: "Reminder emails",
+              value: status?.features.emailReminders ? "Enabled" : "Disabled",
+            },
+            {
+              label: "Contracts limit",
+              value:
+                status?.usage.contractsLimit === null
+                  ? "Unlimited"
+                  : String(status?.usage.contractsLimit ?? "Unknown"),
+            },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-xl border border-white/[0.08] bg-black/20 p-4"
+            >
+              <div className="text-xs uppercase tracking-wider text-[#a3a3a3]">{item.label}</div>
+              <div className="mt-2 text-sm text-white">{item.value}</div>
+            </div>
+          ))}
         </div>
-
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-5">
-          <h2 className="text-sm uppercase tracking-wide text-[#a3a3a3] mb-3">Entitlements</h2>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[#a3a3a3]">Premium</span>
-              <span className={status?.isPremium ? "text-emerald-300" : "text-[#d4d4d4]"}>
-                {status?.isPremium ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#a3a3a3]">CSV Export</span>
-              <span className={status?.features.csvExport ? "text-emerald-300" : "text-[#d4d4d4]"}>
-                {status?.features.csvExport ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[#a3a3a3]">Email Reminders</span>
-              <span className={status?.features.emailReminders ? "text-emerald-300" : "text-[#d4d4d4]"}>
-                {status?.features.emailReminders ? "Enabled" : "Disabled"}
-              </span>
-            </div>
-          </div>
-          <p className="text-xs text-[#a3a3a3] mt-4">
-            Pricing source: {pricingData.source === "live" ? "Live" : "Cached fallback"} · Updated{" "}
-            {formatDate(pricingData.generatedAt)}
-          </p>
-        </div>
-      </div>
+      </section>
     </div>
+  );
+}
+
+function PlanCard({
+  title,
+  price,
+  description,
+  bullets,
+  active,
+  ctaLabel,
+  onClick,
+  disabled,
+}: {
+  title: string;
+  price: string;
+  description: string;
+  bullets: string[];
+  active: boolean;
+  ctaLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <article
+      className={`rounded-2xl border p-6 transition-colors ${
+        active ? "border-cyan-500/40 bg-cyan-500/10" : "border-white/[0.08] bg-[#141414]"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        {active ? (
+          <span className="rounded-full bg-cyan-500/20 px-2.5 py-1 text-xs font-medium text-cyan-300">
+            Active
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-4 text-3xl font-semibold text-white">{price}</div>
+      <p className="mt-3 text-sm leading-6 text-[#a3a3a3]">{description}</p>
+
+      <div className="mt-5 space-y-3">
+        {bullets.map((bullet) => (
+          <div key={bullet} className="flex items-start gap-3 text-sm text-[#cbd5e1]">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-cyan-400" />
+            <span>{bullet}</span>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`mt-6 inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-medium transition-colors ${
+          active || disabled
+            ? "bg-white text-slate-950 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-70"
+            : "bg-cyan-600 text-white hover:bg-cyan-500"
+        }`}
+      >
+        {ctaLabel}
+      </button>
+    </article>
   );
 }

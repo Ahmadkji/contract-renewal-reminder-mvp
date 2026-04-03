@@ -12,7 +12,7 @@ export const SOCIAL_PROOF_TESTIMONIALS = [
   },
   {
     title: 'Upgrade when premium features are needed',
-    description: 'Unlock email reminders and CSV export with monthly or yearly billing plans.',
+    description: 'Unlock unlimited reminder emails, extra recipients, and CSV export with monthly or yearly billing plans.',
     tag: 'Flexible Billing',
   },
 ] as const
@@ -36,10 +36,10 @@ export const FAQ_ITEMS = [
   },
   {
     question: 'Is there a free plan?',
-    answer: 'Yes. You can start on the free plan and upgrade to monthly or yearly billing when you need premium features.',
+    answer: 'Yes. You can start on the free plan with up to 5 contracts and 5 reminder emails before upgrading.',
   },
   {
     question: 'Which premium features are available?',
-    answer: 'Premium unlocks email reminders and CSV export, while also removing the free-plan contract cap.',
+    answer: 'Premium unlocks unlimited reminder emails, additional reminder recipients, CSV export, and removes the free-plan contract cap.',
   },
 ] as const

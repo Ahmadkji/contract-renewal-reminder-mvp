@@ -106,13 +106,23 @@ export function AddContractForm({
         if (errorMessage.includes('Authentication') || errorMessage.includes('Unauthorized')) {
           errorTitle = "Authentication required";
           errorMessage = "Please sign in and try again.";
+        } else if (normalizedMessage.includes('free email reminder quota exhausted')) {
+          errorTitle = "Free reminder limit reached";
+          errorMessage =
+            "Your free plan includes 5 reminder emails. Upgrade in Billing to continue reminder delivery.";
+        } else if (
+          normalizedMessage.includes('additional reminder recipients require an active premium subscription')
+        ) {
+          errorTitle = "Upgrade required";
+          errorMessage =
+            "Free reminder emails send only to your account email. Upgrade to add extra reminder recipients.";
         } else if (
           normalizedMessage.includes('premium subscription') ||
           normalizedMessage.includes('feature_requires_premium')
         ) {
           errorTitle = "Upgrade required";
           errorMessage =
-            "Email reminders are available on premium. Turn off 'Send email reminders' or upgrade in Billing.";
+            "Unlimited reminder emails and extra recipients are available on premium. Adjust reminder settings or upgrade in Billing.";
         } else if (errorMessage.includes('Validation') || errorMessage.includes('required')) {
           errorTitle = "Validation error";
           errorMessage = "Please check your form data and try again.";

@@ -1,241 +1,242 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { User, Bell, Shield, LogOut, Save } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { updateProfileAction } from '@/actions/auth'
+import { useEffect, useMemo, useState } from 'react'
+import { Bell, Save, Settings2, User } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useAuth } from '@/contexts/AuthContext'
 
+interface ProfileState {
+  full_name: string
+  avatar_url: string
+  timezone: string
+  email_notifications: boolean
+}
+
+const TIMEZONE_OPTIONS = [
+  'UTC',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Berlin',
+  'Asia/Karachi',
+  'Asia/Dubai',
+]
+
+function profileToState(profile: {
+  full_name: string | null
+  avatar_url: string | null
+  timezone: string
+  email_notifications: boolean
+} | null): ProfileState {
+  return {
+    full_name: profile?.full_name || '',
+    avatar_url: profile?.avatar_url || '',
+    timezone: profile?.timezone || 'UTC',
+    email_notifications: profile?.email_notifications ?? true,
+  }
+}
+
 export default function SettingsPage() {
-  const { user, logout, loading: authLoading } = useAuth()
-  const [userEmail, setUserEmail] = useState<string>('')
-  const [fullName, setFullName] = useState<string>('')
-  const [avatarUrl, setAvatarUrl] = useState<string>('')
-  const [emailNotifications, setEmailNotifications] = useState<boolean>(true)
-  const [timezone, setTimezone] = useState<string>('UTC')
-  const [loading, setLoading] = useState(true)
+  const { user, profile, refreshSession } = useAuth()
+  const [form, setForm] = useState<ProfileState>(() => profileToState(profile))
   const [saving, setSaving] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(true)
 
-  // Load user profile on mount
   useEffect(() => {
-    if (authLoading) {
-      return
+    setForm(profileToState(profile))
+    setLoadingProfile(false)
+  }, [profile])
+
+  const timezoneOptions = useMemo(() => {
+    const values = new Set(TIMEZONE_OPTIONS)
+    if (form.timezone) {
+      values.add(form.timezone)
     }
+    return Array.from(values)
+  }, [form.timezone])
 
-    const loadProfile = async () => {
-      if (!user?.id) {
-        setUserEmail('')
-        setLoading(false)
-        return
-      }
+  const updateField = <K extends keyof ProfileState>(field: K, value: ProfileState[K]) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }))
+  }
 
-      setLoading(true)
-      const supabase = createClient()
-
-      setUserEmail(user.email || '')
-      setFullName(user.full_name || '')
-
-      // Load profile from database
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('[Settings] Failed to load profile:', error)
-        setLoading(false)
-        return
-      }
-
-      if (profile) {
-        setFullName(profile.full_name || '')
-        setAvatarUrl(profile.avatar_url || '')
-        setEmailNotifications(profile.email_notifications ?? true)
-        setTimezone(profile.timezone || 'UTC')
-      }
-
-      setLoading(false)
-    }
-    
-    void loadProfile()
-  }, [authLoading, user?.email, user?.full_name, user?.id])
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSaveProfile = async (event: React.FormEvent) => {
+    event.preventDefault()
     setSaving(true)
-    
-    const formData = new FormData()
-    formData.append('fullName', fullName)
-    formData.append('avatarUrl', avatarUrl)
-    formData.append('emailNotifications', emailNotifications.toString())
-    formData.append('timezone', timezone)
-    
-    const result = await updateProfileAction(formData)
-    
-    setSaving(false)
-    
-    if (result.success) {
-      toast({
-        title: 'Profile updated',
-        description: 'Your profile has been successfully updated.',
+
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: form.full_name.trim() || null,
+          avatar_url: form.avatar_url.trim() || null,
+          timezone: form.timezone,
+          email_notifications: form.email_notifications,
+        }),
       })
-    } else {
+
+      const payload = await response.json().catch(() => null)
+      if (!response.ok || !payload?.success) {
+        throw new Error(payload?.error || 'Failed to save settings')
+      }
+
+      await refreshSession()
       toast({
-        title: 'Error',
-        description: result.error || 'Failed to update profile',
+        title: 'Settings saved',
+        description: 'Your profile is now stored in Supabase.',
+      })
+    } catch (error) {
+      toast({
+        title: 'Failed to save settings',
+        description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       })
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleLogout = async () => {
-    await logout()
-  }
-
-  if (loading) {
+  if (loadingProfile) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+      <div className="max-w-5xl mx-auto p-6 text-sm text-[#a3a3a3]">
+        Loading settings...
       </div>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold text-white mb-6">Settings</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Account Settings */}
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Account
+    <div className="max-w-5xl mx-auto space-y-6 p-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Settings</h1>
+        <p className="mt-1 text-sm text-[#a3a3a3]">
+          Your profile is stored in Supabase and used by reminders and billing.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <section className="rounded-xl border border-white/[0.08] bg-[#141414] p-6 lg:col-span-2">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-medium text-white">
+            <User className="h-5 w-5" />
+            Workspace profile
           </h2>
-          
+
           <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-[#a3a3a3] mb-2 block">Email</label>
-              <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white">
-                <span className="text-sm">{userEmail}</span>
-              </div>
-            </div>
-            
-            <div>
-              <label htmlFor="fullName" className="text-sm font-medium text-white mb-2 block">Full Name</label>
+            <Field label="Full Name">
               <input
-                id="fullName"
                 type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Enter your full name"
+                value={form.full_name}
+                onChange={(event) => updateField('full_name', event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                placeholder="Renewly Team"
               />
-            </div>
-            
-            <div>
-              <label htmlFor="avatarUrl" className="text-sm font-medium text-white mb-2 block">Avatar URL</label>
+            </Field>
+
+            <Field label="Account Email">
               <input
-                id="avatarUrl"
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                className="w-full bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="https://example.com/avatar.jpg"
+                type="email"
+                value={user?.email || ''}
+                readOnly
+                className="w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-300"
               />
+            </Field>
+
+            <Field label="Avatar URL">
+              <input
+                type="url"
+                value={form.avatar_url}
+                onChange={(event) => updateField('avatar_url', event.target.value)}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                placeholder="https://example.com/avatar.png"
+              />
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Timezone">
+                <select
+                  value={form.timezone}
+                  onChange={(event) => updateField('timezone', event.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                >
+                  {timezoneOptions.map((timezone) => (
+                    <option key={timezone} value={timezone}>
+                      {timezone}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              <Field label="Email Notifications">
+                <button
+                  type="button"
+                  onClick={() => updateField('email_notifications', !form.email_notifications)}
+                  className={`flex h-12 w-full items-center justify-between rounded-lg border px-4 text-sm transition-colors ${
+                    form.email_notifications
+                      ? 'border-cyan-500/30 bg-cyan-500/10 text-white'
+                      : 'border-slate-700 bg-slate-800/50 text-[#a3a3a3]'
+                  }`}
+                >
+                  <span>{form.email_notifications ? 'Enabled' : 'Disabled'}</span>
+                  <Bell className="h-4 w-4" />
+                </button>
+              </Field>
             </div>
-            
+
             <button
               type="submit"
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-all focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-cyan-600 px-4 text-sm font-medium text-white transition-colors hover:bg-cyan-500 disabled:opacity-50"
             >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving...' : 'Save Changes'}
+              <Save className="h-4 w-4" />
+              {saving ? 'Saving...' : 'Save settings'}
             </button>
           </form>
-        </div>
-        
-        {/* Notifications Settings */}
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-            <Bell className="w-5 h-5" />
-            Notifications
-          </h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-white block">Email notifications</label>
-                <p className="text-xs text-[#a3a3a3]">Receive email updates</p>
-              </div>
-              <button
-                onClick={() => setEmailNotifications(!emailNotifications)}
-                className={`w-12 h-6 rounded-full relative transition-colors ${
-                  emailNotifications ? 'bg-cyan-600' : 'bg-slate-700'
-                }`}
-              >
-                <input type="checkbox" checked={emailNotifications} className="sr-only" />
-                <div
-                  className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                    emailNotifications ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-            
-            <div className="rounded-lg border border-white/[0.08] bg-white/[0.02] px-4 py-3">
-              <label className="text-sm font-medium text-white block">Reminder emails</label>
-              <p className="text-xs text-[#a3a3a3] mt-1">
-                Controlled per contract. If global email notifications are off, reminder delivery is skipped.
-              </p>
-            </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="rounded-xl border border-white/[0.08] bg-[#141414] p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-medium text-white">
+              <Settings2 className="h-5 w-5" />
+              Account
+            </h2>
+            <p className="text-sm leading-6 text-[#a3a3a3]">
+              Profile changes are written to Supabase and immediately used by the reminder processor.
+            </p>
           </div>
-        </div>
-        
-        {/* Security Settings */}
-        <div className="bg-[#141414] border border-white/[0.08] rounded-xl p-6">
-          <h2 className="text-lg font-medium text-white mb-4 flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Security
-          </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-white block">Authentication</label>
-              <p className="text-xs text-[#a3a3a3] mt-1">You are securely logged in</p>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-white block">Timezone</label>
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="w-full mt-2 bg-slate-800/50 border border-slate-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              >
-                <option value="UTC">UTC</option>
-                <option value="America/New_York">Eastern Time</option>
-                <option value="America/Los_Angeles">Pacific Time</option>
-                <option value="Europe/London">London</option>
-                <option value="Europe/Paris">Paris</option>
-                <option value="Asia/Tokyo">Tokyo</option>
-                <option value="Asia/Shanghai">Shanghai</option>
-                <option value="Asia/Karachi">Karachi</option>
-                <option value="Asia/Dubai">Dubai</option>
-              </select>
-            </div>
-            
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-500 transition-all focus-ring"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </button>
+
+          <div className="rounded-xl border border-white/[0.08] bg-[#141414] p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-medium text-white">
+              <Bell className="h-5 w-5" />
+              Reminder delivery
+            </h2>
+            <p className="text-sm leading-6 text-[#a3a3a3]">
+              Email reminders respect your timezone and the email notification toggle in this profile row.
+            </p>
           </div>
-        </div>
+        </section>
       </div>
     </div>
+  )
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-white">{label}</span>
+      {children}
+    </label>
   )
 }
