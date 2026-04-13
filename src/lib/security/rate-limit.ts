@@ -235,7 +235,37 @@ function parseIpCandidate(value: string | null): string | null {
     return null
   }
 
+  // Support common proxy formats:
+  // - IPv4 with port: "203.0.113.10:52344"
+  // - Bracketed IPv6 with port: "[2001:db8::1]:443"
+  // - Bare bracketed IPv6: "[2001:db8::1]"
+  const bracketedIpv6 = first.match(/^\[([^[\]]+)\](?::\d+)?$/)?.[1]
+  if (bracketedIpv6 && isIP(bracketedIpv6)) {
+    return bracketedIpv6
+  }
+
+  const ipv4WithPort = first.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/)?.[1]
+  if (ipv4WithPort && isIP(ipv4WithPort)) {
+    return ipv4WithPort
+  }
+
   return isIP(first) ? first : null
+}
+
+function buildUnknownIpFingerprint(request: NextRequest): string {
+  const fingerprintSource = [
+    request.headers.get('x-forwarded-for') || '',
+    request.headers.get('x-vercel-forwarded-for') || '',
+    request.headers.get('x-real-ip') || '',
+    request.headers.get('cf-connecting-ip') || '',
+    request.headers.get('x-vercel-id') || '',
+    request.headers.get('user-agent') || '',
+    request.headers.get('accept-language') || '',
+    request.nextUrl.host || '',
+  ].join('|')
+
+  const digest = createHash('sha256').update(fingerprintSource).digest('hex').slice(0, 24)
+  return `unknown:${digest}`
 }
 
 export function getRequestIp(request: NextRequest): string {
@@ -245,6 +275,11 @@ export function getRequestIp(request: NextRequest): string {
   }
 
   if (TRUST_PROXY_HEADERS) {
+    const vercelForwardedFor = parseIpCandidate(request.headers.get('x-vercel-forwarded-for'))
+    if (vercelForwardedFor) {
+      return vercelForwardedFor
+    }
+
     const cfConnectingIp = parseIpCandidate(request.headers.get('cf-connecting-ip'))
     if (cfConnectingIp) {
       return cfConnectingIp
@@ -261,7 +296,7 @@ export function getRequestIp(request: NextRequest): string {
     }
   }
 
-  return 'unknown'
+  return buildUnknownIpFingerprint(request)
 }
 
 export async function checkRateLimit(key: string, options: RateLimitOptions): Promise<RateLimitResult> {
