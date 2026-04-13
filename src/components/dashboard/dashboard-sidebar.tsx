@@ -58,7 +58,7 @@ export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarP
               expanded ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
             }`}
           >
-            Renewly
+            Doc Renewal
           </span>
         </Link>
         

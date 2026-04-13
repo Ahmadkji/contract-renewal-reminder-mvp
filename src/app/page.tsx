@@ -6,7 +6,6 @@ import {
   Clock,
   Search,
   ArrowRight,
-  Play,
   CheckCircle,
   AlertCircle,
   LayoutDashboard,
@@ -22,17 +21,10 @@ import {
   FileCheck,
   GitBranch,
   ShieldCheck,
-  Eye,
-  Settings,
-  Coffee,
   ChevronDown,
-  Quote,
-  Star,
   Table,
   Minus,
   Check,
-  MessageSquare,
-  Calendar,
   Upload,
   Sparkles,
   TrendingUp,
@@ -52,6 +44,7 @@ import {
   Twitter,
   Linkedin,
   Globe,
+  Quote,
 } from "lucide-react";
 import {
   ANIMATION_DELAY_MS,
@@ -61,27 +54,27 @@ import {
 } from "@/lib/constants";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site-url";
-import { FAQ_ITEMS, SOCIAL_PROOF_TESTIMONIALS } from "@/components/landing/homepage-static-content";
+import { FAQ_ITEMS, WORKFLOW_HIGHLIGHTS } from "@/components/landing/homepage-static-content";
 
 const HOMEPAGE_STRUCTURED_DATA = {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "Organization",
-      name: "Renewly",
+      name: "Doc Renewal",
       url: SITE_URL,
       logo: `${SITE_URL}/logo.svg`,
       description:
-        "Renewly helps small teams track contracts and avoid missed renewal deadlines.",
+        "Doc Renewal helps small teams track contracts and avoid missed renewal deadlines.",
     },
     {
       "@type": "WebSite",
-      name: "Renewly",
+      name: "Doc Renewal",
       url: SITE_URL,
     },
     {
       "@type": "SoftwareApplication",
-      name: "Renewly",
+      name: "Doc Renewal",
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       url: SITE_URL,
@@ -171,7 +164,6 @@ function NavigationBar() {
       "benefits",
       "how-it-works",
       "pricing",
-      "testimonials",
     ];
 
     const observer = new IntersectionObserver(
@@ -216,7 +208,7 @@ function NavigationBar() {
             <Clock className="w-5 h-5 text-cyan-500" />
           </div>
           <span className="font-display text-lg font-bold text-slate-100">
-            Renewly
+            Doc Renewal
           </span>
         </div>
 
@@ -312,43 +304,6 @@ function NavigationBar() {
       )}
     </nav>
   );
-}
-
-// Typing Effect Hook
-function useTypingEffect(text: string, speed: number = 50, delay: number = 0) {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [isComplete, setIsComplete] = useState(false);
-  const [showCursor, setShowCursor] = useState(true);
-
-  useEffect(() => {
-    const startTyping = setTimeout(() => {
-      setIsTyping(true);
-      let currentIndex = 0;
-
-      const typeInterval = setInterval(() => {
-        if (currentIndex < text.length) {
-          setDisplayedText(text.slice(0, currentIndex + 1));
-          currentIndex++;
-        } else {
-          clearInterval(typeInterval);
-          setIsTyping(false);
-          setIsComplete(true);
-
-          // Fade out cursor after 3 seconds
-          setTimeout(() => {
-            setShowCursor(false);
-          }, 3000);
-        }
-      }, speed);
-
-      return () => clearInterval(typeInterval);
-    }, delay);
-
-    return () => clearTimeout(startTyping);
-  }, [text, speed, delay]);
-
-  return { displayedText, isTyping, isComplete, showCursor };
 }
 
 // Hero Section Component - Golden Constellation
@@ -558,7 +513,7 @@ function HeroSection() {
         </div>
 
         <div className="mb-7 text-[10px] uppercase tracking-[0.55em] text-[rgba(212,168,64,0.55)]">
-          Renewly · Contract Renewal Tracker
+            Doc Renewal · Contract Renewal Tracker
         </div>
 
         <h1
@@ -577,7 +532,7 @@ function HeroSection() {
           id="hero-subtitle"
           className="max-w-[560px] text-[17px] leading-[1.8] text-[rgba(240,232,208,0.65)]"
         >
-          Renewly helps small teams track contracts, send reminder emails before
+          Doc Renewal helps small teams track contracts, send reminder emails before
           due dates, and manage all renewals in one simple dashboard.
         </p>
 
@@ -714,7 +669,7 @@ interface ContractRowProps {
   daysLeft: number;
 }
 
-function ContractRow({
+function _ContractRow({
   company,
   contract,
   date,
@@ -1189,7 +1144,7 @@ function BenefitsGridSection() {
         {/* Header */}
         <div className={`text-center mb-16 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
           <h2 className="font-display text-4xl font-bold text-white mb-4">
-            Why teams choose Renewly
+            Why teams choose Doc Renewal
           </h2>
           <p className="text-lg text-slate-400">
             Purpose-built features that save time, money, and sanity
@@ -1464,16 +1419,16 @@ function IntegrationEcosystemBlock() {
 }
 
 // ============================================
-// Phase 2: Section 4 - Social Proof Testimonials
+// Phase 2: Section 4 - Workflow Highlights
 // ============================================
-interface TestimonialCardProps {
+interface HighlightCardProps {
   title: string;
   description: string;
   tag: string;
   featured?: boolean;
 }
 
-function TestimonialCard({ title, description, tag, featured }: TestimonialCardProps) {
+function HighlightCard({ title, description, tag, featured }: HighlightCardProps) {
   const { ref, isVisible } = useScrollReveal();
 
   return (
@@ -1483,17 +1438,8 @@ function TestimonialCard({ title, description, tag, featured }: TestimonialCardP
         featured ? "p-8" : "p-7"
       } card-hover-lift ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}
     >
-      {/* Insight Icon */}
-      <Quote className="absolute top-4 left-4 w-10 h-10 text-slate-800" />
-
-      {/* Featured Stars */}
-      {featured && (
-        <div className="flex gap-1 mb-4 relative z-10">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-          ))}
-        </div>
-      )}
+      {/* Highlight Icon */}
+      <CheckCircle className="absolute top-4 left-4 w-10 h-10 text-slate-800" />
 
       {/* Title */}
       <p className={`font-body text-slate-200 leading-relaxed relative z-10 ${featured ? "text-base" : "text-[15px]"}`}>
@@ -1513,26 +1459,26 @@ function TestimonialCard({ title, description, tag, featured }: TestimonialCardP
   );
 }
 
-function SocialProofSection() {
+function WorkflowHighlightsSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="testimonials" ref={ref} className="relative z-10 py-24 sm:py-32 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0f172a, #020617)" }}>
+    <section id="workflow-highlights" ref={ref} className="relative z-10 py-24 sm:py-32 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0f172a, #020617)" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
           <h2 className="font-display text-4xl font-bold text-white mb-4">
-            Built for real renewal workflows
+            Workflow highlights
           </h2>
           <p className="text-slate-400 text-lg">
             Clear tracking, configurable reminders, and straightforward billing controls.
           </p>
         </div>
 
-        {/* Testimonials Grid */}
+        {/* Highlights Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {SOCIAL_PROOF_TESTIMONIALS.map((testimonial, index) => (
-            <TestimonialCard key={index} {...testimonial} />
+          {WORKFLOW_HIGHLIGHTS.map((highlight, index) => (
+            <HighlightCard key={index} {...highlight} />
           ))}
         </div>
       </div>
@@ -1594,7 +1540,7 @@ interface IconContainerProps {
   iconAnimation: string;
 }
 
-function IconContainer({ step, state, isAnimating, iconAnimation }: IconContainerProps) {
+function IconContainer({ step, state, isAnimating: _isAnimating, iconAnimation }: IconContainerProps) {
   const Icon = step.icon;
   
   return (
@@ -1751,7 +1697,7 @@ interface MobileStepCardProps {
   connectorState: "empty" | "partial" | "full";
 }
 
-function MobileStepCard({ step, state, iconAnimation, showConnector, connectorState }: MobileStepCardProps) {
+function _MobileStepCard({ step, state, iconAnimation: _iconAnimation, showConnector, connectorState }: MobileStepCardProps) {
   return (
     <div className="flex items-center gap-4">
       {/* Card */}
@@ -1812,7 +1758,7 @@ function ConnectedPathSection() {
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
   // Calculate progress positions for dots (0%, 33.33%, 66.66%, 100%)
-  const cardPositions = [0, 33.33, 66.66, 100];
+  const _cardPositions = [0, 33.33, 66.66, 100];
 
   // Clear all timeouts
   const clearAllTimeouts = useCallback(() => {
@@ -2048,12 +1994,12 @@ function ComparisonSection() {
   const { ref, isVisible } = useScrollReveal();
 
   const features = [
-    { label: "Renewal date visibility", spreadsheet: { icon: "minus", text: "Varies" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
-    { label: "Contract status tracking", spreadsheet: { icon: "minus", text: "Manual" }, crm: { icon: "minus", text: "Generic" }, renewly: { icon: "check", text: "Focused" } },
-    { label: "Reminder scheduling", spreadsheet: { icon: "x", text: "Limited" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Included" } },
-    { label: "Email reminders", spreadsheet: { icon: "x", text: "External setup" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "5 free emails" } },
-    { label: "CSV export", spreadsheet: { icon: "check", text: "Native" }, crm: { icon: "minus", text: "Depends" }, renewly: { icon: "check", text: "Premium" } },
-    { label: "Billing controls", spreadsheet: { icon: "x", text: "N/A" }, crm: { icon: "minus", text: "Varies" }, renewly: { icon: "check", text: "Included" } },
+    { label: "Renewal date visibility", spreadsheet: { icon: "minus", text: "Varies" }, crm: { icon: "minus", text: "Varies" }, docRenewal: { icon: "check", text: "Included" } },
+    { label: "Contract status tracking", spreadsheet: { icon: "minus", text: "Manual" }, crm: { icon: "minus", text: "Generic" }, docRenewal: { icon: "check", text: "Focused" } },
+    { label: "Reminder scheduling", spreadsheet: { icon: "x", text: "Limited" }, crm: { icon: "minus", text: "Depends" }, docRenewal: { icon: "check", text: "Included" } },
+    { label: "Email reminders", spreadsheet: { icon: "x", text: "External setup" }, crm: { icon: "minus", text: "Depends" }, docRenewal: { icon: "check", text: "5 free emails" } },
+    { label: "CSV export", spreadsheet: { icon: "check", text: "Native" }, crm: { icon: "minus", text: "Depends" }, docRenewal: { icon: "check", text: "Premium" } },
+    { label: "Billing controls", spreadsheet: { icon: "x", text: "N/A" }, crm: { icon: "minus", text: "Varies" }, docRenewal: { icon: "check", text: "Included" } },
   ];
 
   const getIcon = (icon: string) => {
@@ -2088,7 +2034,7 @@ function ComparisonSection() {
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
           <h2 className="font-display text-4xl font-bold text-white mb-4">
-            Where Renewly is focused
+            Where Doc Renewal is focused
           </h2>
           <p className="text-lg text-slate-400">
             A feature-level view of renewal tracking coverage
@@ -2111,7 +2057,7 @@ function ComparisonSection() {
               </div>
               <div className="flex items-center justify-center gap-2 text-cyan-400">
                 <Zap className="w-4 h-4" />
-                <span className="font-bold">Renewly</span>
+                <span className="font-bold">Doc Renewal</span>
               </div>
             </div>
 
@@ -2138,9 +2084,9 @@ function ComparisonSection() {
                   </span>
                 </div>
                 <div className="flex items-center justify-center gap-2 py-2 bg-cyan-500/10 rounded-lg">
-                  {getIcon(feature.renewly.icon)}
-                  <span className={`text-sm font-medium ${getTextColor(feature.renewly.icon)}`}>
-                    {feature.renewly.text}
+                  {getIcon(feature.docRenewal.icon)}
+                  <span className={`text-sm font-medium ${getTextColor(feature.docRenewal.icon)}`}>
+                    {feature.docRenewal.text}
                   </span>
                 </div>
               </div>
@@ -2233,7 +2179,7 @@ function FAQSection() {
 }
 
 // ============================================
-// Phase 3: Section 1 - Why Renewly (Logic Grid)
+// Phase 3: Section 1 - Why Doc Renewal (Logic Grid)
 // ============================================
 
 const IMPACT_CARDS = [
@@ -2275,7 +2221,7 @@ const IMPACT_CARDS = [
   },
 ] as const;
 
-function WhyRenewlySection() {
+function WhyDocRenewalSection() {
   const { ref, isVisible } = useScrollReveal(0.2);
 
   return (
@@ -2601,7 +2547,7 @@ function RedditTruthSection() {
           style={{ animationDelay: "1500ms" }}
         >
           <p className="text-sm text-slate-400 mb-4">
-            Renewly is built to reduce renewal surprises and manual follow-up work.
+            Doc Renewal is built to reduce renewal surprises and manual follow-up work.
           </p>
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <button className="px-5 py-3 bg-slate-800 text-slate-200 text-sm font-medium rounded-lg hover:bg-slate-700 transition-all hover:-translate-y-0.5">
@@ -2754,7 +2700,7 @@ function WhoUsesItSection() {
 
               {/* Bullet Points */}
               <ul className="space-y-2">
-                {currentRole.bullets.map((bullet, i) => (
+                {currentRole.bullets.map((bullet, _i) => (
                   <li
                     key={bullet}
                     className="flex items-center gap-2 text-sm text-slate-300"
@@ -3022,7 +2968,7 @@ function IndustryFitSection() {
             Built for every team
           </h2>
           <p className="text-sm text-slate-400 max-w-md mx-auto">
-            From startups to enterprises, Renewly adapts to your workflow.
+            From startups to enterprises, Doc Renewal adapts to your workflow.
           </p>
         </div>
 
@@ -3526,7 +3472,7 @@ function Footer() {
               <Clock className="w-4 h-4 text-slate-950" />
             </div>
             <span className="font-display text-lg font-bold text-slate-100">
-              Renewly
+              Doc Renewal
             </span>
           </div>
           <p className="text-sm text-slate-400">
@@ -3663,11 +3609,11 @@ export default function Home() {
       <ProblemSolutionSection />
       <BenefitsGridSection />
       <FeatureDeepDiveSection />
-      <SocialProofSection />
+      <WorkflowHighlightsSection />
       <ConnectedPathSection />
 
       {/* Phase 3 Sections */}
-      <WhyRenewlySection />
+      <WhyDocRenewalSection />
       <RedditTruthSection />
       <WhoUsesItSection />
       <PainToSolutionSection />

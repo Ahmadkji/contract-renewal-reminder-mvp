@@ -43,6 +43,13 @@ export const EmailDataSchema = z.object({
   replyTo: z.string().email('Invalid reply-to email address').optional(),
 });
 
+type ValidatedEmailData = z.infer<typeof EmailDataSchema>;
+type EmailAttachment = {
+  filename?: string;
+  content?: string | Buffer;
+  path?: string;
+};
+
 /**
  * Validate email address
  * @param {string} email - Email address to validate
@@ -50,7 +57,7 @@ export const EmailDataSchema = z.object({
  */
 export function isValidEmail(email: string): boolean {
   try {
-    EmailSchema.parse(email);
+    EmailSchema.parse(email.trim());
     return true;
   } catch {
     return false;
@@ -76,10 +83,10 @@ export function isValidMultipleEmails(emails: string): boolean {
  * @param {any} data - Email data to validate
  * @returns {Object} Validation result with success and error
  */
-export function validateEmailData(data: any): {
+export function validateEmailData(data: unknown): {
   success: boolean;
   error?: string;
-  data?: any;
+  data?: ValidatedEmailData;
 } {
   try {
     const validatedData = EmailDataSchema.parse(data);
@@ -138,18 +145,20 @@ export function sanitizeEmailContent(content: string): string {
  * @param {any} attachment - Attachment to validate
  * @returns {boolean} True if valid, false otherwise
  */
-export function isValidAttachment(attachment: any): boolean {
+export function isValidAttachment(attachment: unknown): boolean {
   if (!attachment || typeof attachment !== 'object') {
     return false;
   }
 
+  const candidate = attachment as EmailAttachment;
+
   // Check for required fields
-  if (!attachment.filename || typeof attachment.filename !== 'string') {
+  if (!candidate.filename || typeof candidate.filename !== 'string') {
     return false;
   }
 
   // Check for content or path
-  if (!attachment.content && !attachment.path) {
+  if (!candidate.content && !candidate.path) {
     return false;
   }
 
@@ -161,7 +170,7 @@ export function isValidAttachment(attachment: any): boolean {
  * @param {any[]} attachments - Attachments to validate
  * @returns {boolean} True if all valid, false otherwise
  */
-export function isValidAttachments(attachments: any[]): boolean {
+export function isValidAttachments(attachments: unknown[]): boolean {
   if (!Array.isArray(attachments)) {
     return false;
   }

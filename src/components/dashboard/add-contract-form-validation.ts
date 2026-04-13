@@ -36,6 +36,14 @@ export function validateForm(
     errors.vendorEmail = "Invalid email format";
   }
 
+  const hasVendorContact = Boolean(formData.vendorContact.trim());
+  const hasVendorEmail = Boolean(formData.vendorEmail.trim());
+  if (hasVendorContact !== hasVendorEmail) {
+    const message = "Contact person and contact email must be provided together";
+    errors.vendorContact = message;
+    errors.vendorEmail = message;
+  }
+
   return {
     valid: Object.keys(errors).length === 0,
     errors,

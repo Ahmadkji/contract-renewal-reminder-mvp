@@ -25,7 +25,22 @@ interface ApiResponse<T> {
   pagination?: {
     total: number;
   };
+  code?: string;
   error?: string;
+}
+
+class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
+  }
 }
 
 async function apiRequest<T>(input: RequestInfo | URL, init?: RequestInit): Promise<ApiResponse<T>> {
@@ -42,10 +57,23 @@ async function apiRequest<T>(input: RequestInfo | URL, init?: RequestInit): Prom
   const payload = await response.json().catch(() => null);
 
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.error || `Request failed (${response.status})`);
+    throw new ApiError(
+      payload?.error || `Request failed (${response.status})`,
+      response.status,
+      payload?.code,
+      payload?.details
+    );
   }
 
   return payload as ApiResponse<T>;
+}
+
+function isHandledContractError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) {
+    return false;
+  }
+
+  return error.status >= 400 && error.status < 500;
 }
 
 function sortContractsByEndDate(contracts: ContractSummary[]): ContractSummary[] {
@@ -222,6 +250,11 @@ export function useCreateContract() {
       logger.info("Contract created successfully:", data);
     },
     onError: (error: Error) => {
+      if (isHandledContractError(error)) {
+        logger.warn("Failed to create contract:", error);
+        return;
+      }
+
       logger.error("Failed to create contract:", error);
     },
   });
@@ -267,6 +300,39 @@ export function useUpdateContract() {
       logger.info("Contract updated successfully:", data);
     },
     onError: (error: Error) => {
+      if (error instanceof ApiError && (error.code === 'AUTH_REQUIRED' || error.status === 401)) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again to continue editing.",
+          variant: "destructive",
+        });
+        // Trigger a page refresh to re-authenticate via middleware
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+        return;
+      }
+
+      if (error instanceof ApiError && error.code === 'CONTRACT_NOT_FOUND') {
+        toast({
+          title: "Contract not found",
+          description: "This contract may have been deleted. Refreshing...",
+          variant: "destructive",
+        });
+        // Invalidate queries to refresh the contract list
+        queryClient.invalidateQueries({ queryKey: ["contracts"] });
+        return;
+      }
+
+      if (error instanceof ApiError && error.code === 'CONTRACT_ACCESS_DENIED') {
+        toast({
+          title: "Access denied",
+          description: "You don't have permission to edit this contract.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       logger.error("Failed to update contract:", error);
     },
   });

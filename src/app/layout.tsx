@@ -26,11 +26,11 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Contract Renewal Tracker for Small Teams | Renewly",
-    template: "%s | Renewly",
+    default: "Contract Renewal Tracker for Small Teams | Doc Renewal",
+    template: "%s | Doc Renewal",
   },
   description:
-    "Renewly is a contract renewal tracker for small teams. Track contracts, get renewal reminders, and manage deadlines from one dashboard.",
+    "Doc Renewal is a contract renewal tracker for small teams. Track contracts, get renewal reminders, and manage deadlines from one dashboard.",
   keywords: [
     "contract renewal tracker",
     "contract reminder software",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     "contract renewal alerts",
     "contract management for small business",
   ],
-  authors: [{ name: "Renewly Team" }],
+  authors: [{ name: "Doc Renewal Team" }],
   icons: {
     icon: "/favicon.ico",
   },
@@ -54,11 +54,11 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "Contract Renewal Tracker for Small Teams | Renewly",
+    title: "Contract Renewal Tracker for Small Teams | Doc Renewal",
     description:
-      "Track contracts, send renewal reminders, and avoid missed deadlines with Renewly.",
+      "Track contracts, send renewal reminders, and avoid missed deadlines with Doc Renewal.",
     url: "/",
-    siteName: "Renewly",
+    siteName: "Doc Renewal",
     locale: "en_US",
     type: "website",
     images: [
@@ -66,15 +66,15 @@ export const metadata: Metadata = {
         url: "/og-image.svg",
         width: 1200,
         height: 630,
-        alt: "Renewly contract renewal tracker dashboard preview",
+        alt: "Doc Renewal contract renewal tracker dashboard preview",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Contract Renewal Tracker for Small Teams | Renewly",
+    title: "Contract Renewal Tracker for Small Teams | Doc Renewal",
     description:
-      "Track contracts and get renewal reminders before deadlines with Renewly.",
+      "Track contracts and get renewal reminders before deadlines with Doc Renewal.",
     images: ["/og-image.svg"],
   },
 };

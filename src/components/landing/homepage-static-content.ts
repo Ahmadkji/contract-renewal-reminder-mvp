@@ -1,4 +1,4 @@
-export const SOCIAL_PROOF_TESTIMONIALS = [
+export const WORKFLOW_HIGHLIGHTS = [
   {
     title: 'Track contracts in a single dashboard',
     description: 'Keep names, vendors, values, and renewal dates organized without spreadsheet sprawl.',
@@ -28,7 +28,7 @@ export const FAQ_ITEMS = [
   },
   {
     question: 'Do you store my contract files?',
-    answer: 'Renewly stores contract metadata used for tracking and reminders, such as dates, names, values, and settings.',
+    answer: 'Doc Renewal stores contract metadata used for tracking and reminders, such as dates, names, values, and settings.',
   },
   {
     question: 'Can I customize reminder timing?',

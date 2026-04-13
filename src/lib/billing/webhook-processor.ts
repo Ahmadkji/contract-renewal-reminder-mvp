@@ -91,10 +91,13 @@ function mapStatusFromEventType(eventType: string, fallbackStatus: string | null
   if (normalized.includes('subscription.paid')) return 'active'
   if (normalized.includes('subscription.active')) return 'active'
   if (normalized.includes('subscription.trial')) return 'trialing'
+  if (normalized.includes('subscription.scheduled_cancel')) return 'scheduled_cancel'
+  if (normalized.includes('subscription.paused')) return 'paused'
   if (normalized.includes('subscription.canceled')) return 'canceled'
   if (normalized.includes('subscription.expired')) return 'expired'
   if (normalized.includes('subscription.past_due')) return 'past_due'
   if (normalized.includes('subscription.unpaid')) return 'unpaid'
+  if (normalized.includes('subscription.incomplete')) return 'incomplete'
   if (normalized.includes('subscription.refund')) return 'refunded'
   if (normalized.includes('subscription.dispute')) return 'disputed'
 

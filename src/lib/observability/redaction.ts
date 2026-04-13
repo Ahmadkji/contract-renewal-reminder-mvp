@@ -12,9 +12,27 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
 
+function isErrorLike(value: unknown): value is Error {
+  return value instanceof Error
+}
+
+function redactError(value: Error): Record<string, unknown> {
+  return {
+    name: value.name || 'Error',
+    message: redactString(value.message || 'Unknown error'),
+    ...(typeof value.stack === 'string'
+      ? { stack: redactString(value.stack.slice(0, 4000)) }
+      : {}),
+  }
+}
+
 export function redactValue(value: unknown, depth: number = 0): unknown {
   if (depth > 6) {
     return '[TRUNCATED]'
+  }
+
+  if (isErrorLike(value)) {
+    return redactError(value)
   }
 
   if (typeof value === 'string') {

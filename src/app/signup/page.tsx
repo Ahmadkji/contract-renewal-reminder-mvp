@@ -50,7 +50,7 @@ export default function SignupPage() {
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-md items-center">
         <div className="w-full rounded-3xl border border-white/[0.08] bg-[#141414] p-8 shadow-2xl shadow-black/30">
           <div className="mb-6">
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Renewly</p>
+            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Doc Renewal</p>
             <h1 className="mt-3 text-3xl font-semibold">Create account</h1>
             <p className="mt-2 text-sm leading-6 text-[#a3a3a3]">
               Sign up with a strong password and verify your email to start using the app.
@@ -64,7 +64,7 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(event) => setFullName(event.target.value)}
                 className="w-full rounded-xl border border-white/[0.08] bg-black/30 px-4 py-3 text-sm text-white outline-none ring-0 focus:border-cyan-500"
-                placeholder="Renewly Team"
+                placeholder="Doc Renewal Team"
               />
             </Field>
 

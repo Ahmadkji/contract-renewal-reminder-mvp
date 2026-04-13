@@ -14,15 +14,16 @@ export class AuthError extends Error {
   }
 }
 
-function buildAuthErrorLogPayload(error: any): { message: string; status?: number; code?: string } {
+function buildAuthErrorLogPayload(error: unknown): { message: string; status?: number; code?: string } {
+  const candidate = error as { message?: unknown; status?: unknown; code?: unknown }
   return {
-    message: typeof error?.message === 'string' ? error.message : 'Unknown auth error',
-    status: typeof error?.status === 'number' ? error.status : undefined,
-    code: typeof error?.code === 'string' ? error.code : undefined,
+    message: typeof candidate?.message === 'string' ? candidate.message : 'Unknown auth error',
+    status: typeof candidate?.status === 'number' ? candidate.status : undefined,
+    code: typeof candidate?.code === 'string' ? candidate.code : undefined,
   }
 }
 
-function logAuthError(label: string, error: any): void {
+function logAuthError(label: string, error: unknown): void {
   const payload = buildAuthErrorLogPayload(error)
 
   if (process.env.NODE_ENV === 'development') {
@@ -48,19 +49,26 @@ function normalizeRetryAfterSeconds(value: unknown): number | null {
   return null
 }
 
-function parseRetryAfterFromError(error: any): number | null {
+function parseRetryAfterFromError(error: unknown): number | null {
+  const candidate = error as {
+    retryAfterSeconds?: unknown
+    retry_after?: unknown
+    retryAfter?: unknown
+    headers?: Record<string, unknown>
+    message?: unknown
+  }
   const directRetryAfter =
-    normalizeRetryAfterSeconds(error?.retryAfterSeconds) ??
-    normalizeRetryAfterSeconds(error?.retry_after) ??
-    normalizeRetryAfterSeconds(error?.retryAfter)
+    normalizeRetryAfterSeconds(candidate?.retryAfterSeconds) ??
+    normalizeRetryAfterSeconds(candidate?.retry_after) ??
+    normalizeRetryAfterSeconds(candidate?.retryAfter)
 
   if (directRetryAfter) {
     return directRetryAfter
   }
 
   const headers =
-    error?.headers && typeof error.headers === 'object'
-      ? error.headers
+    candidate?.headers && typeof candidate.headers === 'object'
+      ? candidate.headers
       : null
 
   const headerRetryAfter =
@@ -71,7 +79,7 @@ function parseRetryAfterFromError(error: any): number | null {
     return headerRetryAfter
   }
 
-  const message = typeof error?.message === 'string' ? error.message : ''
+  const message = typeof candidate?.message === 'string' ? candidate.message : ''
   const match = message.match(/(\d+)\s*(seconds|second|secs|sec|s)\b/i)
   if (match?.[1]) {
     return normalizeRetryAfterSeconds(match[1])
@@ -84,10 +92,11 @@ function parseRetryAfterFromError(error: any): number | null {
  * Maps Supabase errors to user-friendly, secure error messages
  * Never exposes internal error details or database information
  */
-export function mapSupabaseError(error: any): AuthError {
-  const message = error?.message || ''
-  const status = error?.status || 500
-  const code = error?.code || ''
+export function mapSupabaseError(error: unknown): AuthError {
+  const candidate = error as { message?: unknown; status?: unknown; code?: unknown }
+  const message = typeof candidate?.message === 'string' ? candidate.message : ''
+  const status = typeof candidate?.status === 'number' ? candidate.status : 500
+  const code = typeof candidate?.code === 'string' ? candidate.code : ''
 
   logAuthError('Supabase Auth Error:', error)
 

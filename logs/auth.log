@@ -1,8 +1,0 @@
-{"action":"signup","success":true,"email":"zain786ahmadkhan@gmail.com","timestamp":"2026-03-17T16:41:56.636Z"}
-{"action":"signup","success":true,"email":"zain786ahmadkhan@gmail.com","timestamp":"2026-03-17T17:15:30.338Z"}
-{"action":"login","success":false,"email":"zain786ahmadkhan@gmail.com","error":"Email not confirmed","timestamp":"2026-03-17T17:15:53.470Z"}
-{"action":"login","success":false,"email":"zain786ahmadkhan@gmail.com","error":"Email not confirmed","timestamp":"2026-03-17T17:16:14.238Z"}
-{"action":"login","success":true,"userId":"4e9c5ee4-67ef-4992-9f3d-c24bce92103f","email":"zain786ahmadkhan@gmail.com","timestamp":"2026-03-17T17:16:30.968Z"}
-{"action":"signup","success":true,"userId":"4e9c5ee4-67ef-4992-9f3d-c24bce92103f","email":"mkashifiqbal303@gmail.com","timestamp":"2026-03-17T17:17:46.216Z"}
-{"action":"login","success":false,"email":"mkashifiqbal303@gmail.com","error":"Invalid login credentials","timestamp":"2026-03-17T17:53:12.726Z"}
-{"action":"signup","success":true,"userId":"4e9c5ee4-67ef-4992-9f3d-c24bce92103f","email":"mkashifiqbal303@gmail.com","timestamp":"2026-03-17T17:53:30.350Z"}

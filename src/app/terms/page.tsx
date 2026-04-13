@@ -4,7 +4,7 @@ import { LEGAL_LAST_UPDATED, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "Terms of Service for Renewly.",
+  description: "Terms of Service for Doc Renewal.",
 };
 
 export default function TermsPage() {
@@ -15,7 +15,7 @@ export default function TermsPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Legal</p>
           <h1 className="text-3xl font-semibold">Terms of Service</h1>
           <p className="text-sm text-slate-300">
-            These terms govern use of Renewly&apos;s contract renewal tracking platform.
+            These terms govern use of Doc Renewal&apos;s contract renewal tracking platform.
           </p>
           <p className="text-xs text-slate-400">Last updated: {LEGAL_LAST_UPDATED}</p>
         </header>
@@ -23,7 +23,7 @@ export default function TermsPage() {
         <section className="space-y-3 text-sm text-slate-300">
           <h2 className="text-xl font-semibold text-slate-100">1. Service</h2>
           <p>
-            Renewly helps teams track contracts, renewal timelines, reminders, and billing status. You are
+            Doc Renewal helps teams track contracts, renewal timelines, reminders, and billing status. You are
             responsible for the information you upload and for managing access to your account.
           </p>
         </section>
@@ -57,7 +57,7 @@ export default function TermsPage() {
         <section className="space-y-3 text-sm text-slate-300">
           <h2 className="text-xl font-semibold text-slate-100">4. Acceptable Use</h2>
           <p>
-            You may not use Renewly for illegal, fraudulent, abusive, or deceptive activity. We can suspend
+            You may not use Doc Renewal for illegal, fraudulent, abusive, or deceptive activity. We can suspend
             access if misuse creates security or compliance risk.
           </p>
         </section>

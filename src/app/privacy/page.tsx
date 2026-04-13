@@ -4,7 +4,7 @@ import { LEGAL_LAST_UPDATED, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
-  description: "Privacy Policy for Renewly.",
+  description: "Privacy Policy for Doc Renewal.",
 };
 
 export default function PrivacyPolicyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Legal</p>
           <h1 className="text-3xl font-semibold">Privacy Policy</h1>
           <p className="text-sm text-slate-300">
-            This policy explains how Renewly collects, uses, and protects personal data.
+            This policy explains how Doc Renewal collects, uses, and protects personal data.
           </p>
           <p className="text-xs text-slate-400">Last updated: {LEGAL_LAST_UPDATED}</p>
         </header>
@@ -55,7 +55,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3 text-sm text-slate-300">
           <h2 className="text-xl font-semibold text-slate-100">Data Sharing</h2>
           <p>
-            We share data only with service providers needed to operate Renewly, such as hosting,
+            We share data only with service providers needed to operate Doc Renewal, such as hosting,
             authentication, email delivery, and billing infrastructure. We do not sell personal data.
           </p>
         </section>

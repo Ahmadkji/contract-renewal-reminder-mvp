@@ -10,9 +10,6 @@ node_modules
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
 # next.js
 /.next/
 /out/
@@ -43,10 +40,6 @@ next-env.d.ts
 local-*
 .claude
 .z-ai-config
-dev.log
-test
-prompt
-
-server.log
 # Skills directory
 /skills/
+.opencode

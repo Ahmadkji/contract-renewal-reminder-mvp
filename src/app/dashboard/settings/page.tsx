@@ -135,7 +135,7 @@ export default function SettingsPage() {
                 value={form.full_name}
                 onChange={(event) => updateField('full_name', event.target.value)}
                 className="w-full rounded-lg border border-slate-700 bg-slate-800/50 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                placeholder="Renewly Team"
+                placeholder="Doc Renewal Team"
               />
             </Field>
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { connection } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 import { ensureProfileForUser, getProfileByUserId } from '@/lib/db/profiles'
 import { serverEnv as env } from '@/lib/env/server'
@@ -12,43 +13,11 @@ function getHeaders(request: NextRequest) {
   }
 }
 
-function parseCookieHeader(cookieHeader: string | null): Array<{ name: string; value: string }> {
-  if (!cookieHeader) {
-    return []
-  }
-
-  return cookieHeader
-    .split(';')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const separatorIndex = entry.indexOf('=')
-      if (separatorIndex <= 0) {
-        return null
-      }
-
-      const name = entry.slice(0, separatorIndex).trim()
-      const rawValue = entry.slice(separatorIndex + 1).trim()
-      if (!name || !rawValue) {
-        return null
-      }
-
-      try {
-        return { name, value: decodeURIComponent(rawValue) }
-      } catch {
-        return { name, value: rawValue }
-      }
-    })
-    .filter((value): value is { name: string; value: string } => Boolean(value))
-}
-
 function createRequestScopedSupabaseClient(request: NextRequest) {
-  const cookieValues = parseCookieHeader(request.headers.get('cookie'))
-
   return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
-        return cookieValues
+        return request.cookies.getAll()
       },
       setAll() {
         // No-op: this read-only route only needs the current request session.
@@ -59,6 +28,7 @@ function createRequestScopedSupabaseClient(request: NextRequest) {
 
 async function handleAuthState(request: NextRequest) {
   try {
+    await connection()
     const supabase = createRequestScopedSupabaseClient(request)
     const { data, error } = await supabase.auth.getUser()
 

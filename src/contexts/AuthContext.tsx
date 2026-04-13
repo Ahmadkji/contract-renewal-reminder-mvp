@@ -102,10 +102,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session: null,
       loading,
       logout: async () => {
-        await fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'include',
-        }).catch(() => undefined)
+        try {
+          const response = await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'include',
+          })
+          if (!response.ok) {
+            console.error('[AuthContext] Logout request failed:', response.status)
+            return
+          }
+        } catch (error) {
+          console.error('[AuthContext] Logout network error:', error)
+          return
+        }
         setUser(null)
         setProfile(null)
         router.replace('/login')
@@ -117,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(nextAuthState.profile)
       },
     }),
-    [loading, pathname, router, user, profile]
+    [loading, router, user, profile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

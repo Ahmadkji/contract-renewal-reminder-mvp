@@ -53,11 +53,20 @@ function mapContractUpdateError(error: unknown): {
 } {
   const message = error instanceof Error ? error.message : ''
 
-  if (message.includes('Contract not found or access denied')) {
+  // Pre-flight errors from updateContract()
+  if (message === 'Contract not found' || message.includes('Contract not found or access denied')) {
     return {
       status: 404,
       code: 'CONTRACT_NOT_FOUND',
-      message: 'Contract not found or access denied',
+      message: 'Contract not found or access denied.',
+    }
+  }
+
+  if (message === 'Authentication required') {
+    return {
+      status: 401,
+      code: 'AUTH_REQUIRED',
+      message: 'Your session has expired. Please sign in again.',
     }
   }
 
@@ -66,6 +75,22 @@ function mapContractUpdateError(error: unknown): {
       status: 403,
       code: 'FEATURE_REQUIRES_PREMIUM',
       message: 'Email reminders require an active premium subscription.',
+    }
+  }
+
+  if (message.includes('Additional reminder recipients require an active premium subscription')) {
+    return {
+      status: 403,
+      code: 'FEATURE_REQUIRES_PREMIUM',
+      message: 'Additional reminder recipients require an active premium subscription.',
+    }
+  }
+
+  if (message.includes('Free email reminder quota exhausted')) {
+    return {
+      status: 403,
+      code: 'FREE_EMAIL_QUOTA_EXHAUSTED',
+      message: 'Free email reminder quota exhausted. Upgrade to continue sending reminders.',
     }
   }
 
@@ -97,14 +122,14 @@ export async function GET(
     if (sessionError) {
       console.error('[GET /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.' },
+        { success: false, error: 'Authentication error. Please sign in again.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - please sign in' },
+        { success: false, error: 'Unauthorized - please sign in', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
@@ -165,14 +190,14 @@ export async function PATCH(
     if (sessionError) {
       console.error('[PATCH /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.' },
+        { success: false, error: 'Authentication error. Please sign in again.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - please sign in' },
+        { success: false, error: 'Unauthorized - please sign in', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
@@ -183,7 +208,18 @@ export async function PATCH(
     }
 
     const { id } = await params
-    const body = await request.json()
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid JSON payload.',
+        },
+        { status: 400 }
+      )
+    }
     const validationResult = validateContractInput(body)
     if (!validationResult.success) {
       return NextResponse.json(
@@ -277,14 +313,14 @@ export async function DELETE(
     if (sessionError) {
       console.error('[DELETE /api/contracts/[id]] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.' },
+        { success: false, error: 'Authentication error. Please sign in again.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - please sign in' },
+        { success: false, error: 'Unauthorized - please sign in', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }

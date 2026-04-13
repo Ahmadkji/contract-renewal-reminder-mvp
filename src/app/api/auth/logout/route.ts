@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createWritableClient } from '@/lib/supabase/server'
 import { validateOrigin, getOriginErrorResponse, logInvalidOriginAttempt } from '@/lib/security/csrf'
 import { getRequestIdFromHeaders } from '@/lib/observability/request-id'
 
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return getOriginErrorResponse()
     }
 
-    const supabase = await createClient()
+    const supabase = await createWritableClient()
     const { error } = await supabase.auth.signOut()
 
     if (error) {

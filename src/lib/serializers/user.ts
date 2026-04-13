@@ -6,13 +6,13 @@
  * 
  * Only include fields that your application actually needs.
  */
-export function serializeUser(user: any | null): SerializedUser | null {
+export function serializeUser(user: User | null): SerializedUser | null {
   if (!user) return null
   
   return {
     id: user.id,
-    email: user.email,
-    email_confirmed: Boolean(user.email_confirmed ?? user.email_confirmed_at),
+    email: user.email ?? '',
+    email_confirmed: Boolean(user.email_confirmed_at),
     created_at: user.created_at,
     full_name:
       typeof user.user_metadata?.full_name === 'string'
@@ -31,3 +31,4 @@ export interface SerializedUser {
   created_at: string
   full_name: string | null
 }
+import type { User } from '@supabase/supabase-js'

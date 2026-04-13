@@ -282,6 +282,67 @@ async function completeClaimedReminderDelivery(
   }
 }
 
+/**
+ * Batch commit multiple reminders in a single RPC call
+ * Optimization: Reduces N RPC calls to 1 RPC call
+ * Safety: Maintains claim token validation and audit trail
+ */
+async function _batchCommitReminders(
+  adminClient: ReminderAdminClient,
+  sentResults: Array<{
+    reminderId: string;
+    contractId: string;
+    contractName: string;
+    recipients: string[];
+    deliveryTier: DueReminderRecord['delivery_tier'];
+    status: 'sent';
+  }>,
+  claimToken: string,
+  deliveryTier: 'free_trial' | 'premium',
+  sentAtIso: string
+) {
+  const reminderIds = sentResults.map((r) => r.reminderId);
+
+  const { error } = await adminClient.rpc('batch_complete_email_reminders', {
+    p_reminder_ids: reminderIds,
+    p_claim_token: claimToken,
+    p_delivery_tier: deliveryTier,
+    p_sent_at: sentAtIso,
+  });
+
+  if (error) {
+    logger.error('[ReminderProcessor] Batch commit failed', {
+      context: 'ReminderProcessor',
+      reminderCount: reminderIds.length,
+      error: error.message,
+    });
+    
+    // Fallback to individual commits if batch fails
+    logger.warn('[ReminderProcessor] Falling back to individual commits', {
+      context: 'ReminderProcessor',
+      reminderCount: reminderIds.length,
+    });
+
+    for (const result of sentResults) {
+      try {
+        await completeClaimedReminderDelivery(
+          adminClient,
+          result.reminderId,
+          claimToken,
+          result.deliveryTier,
+          sentAtIso
+        );
+      } catch (fallbackError) {
+        logger.error('[ReminderProcessor] Individual commit also failed', {
+          context: 'ReminderProcessor',
+          reminderId: result.reminderId,
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+        });
+      }
+    }
+  }
+}
+
 async function releaseStaleClaims(
   adminClient: ReminderAdminClient,
   runAt: Date,
@@ -429,7 +490,6 @@ export async function runReminderProcessor(
       reminder.delivery_tier,
       runAt.toISOString()
     );
-
     return {
       reminderId: reminder.reminder_id,
       contractId: reminder.contract_id,

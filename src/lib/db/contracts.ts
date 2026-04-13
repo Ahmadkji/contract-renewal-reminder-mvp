@@ -590,6 +590,23 @@ export async function updateContract(
 ): Promise<ContractWithDetails> {
   const supabase = await getSupabase()
 
+  // Pre-flight ownership check: verify the contract exists and belongs to the
+  // current user BEFORE calling the atomic RPC. This disambiguates "not found"
+  // from "access denied" and avoids the opaque RPC error.
+  //
+  // Note: Auth context is already established by the proxy (proxy.ts) which
+  // runs on every request and refreshes expired JWTs. No need for a defensive
+  // getUser() call here.
+  if (userId) {
+    const existingContract = await getContractById(id, userId)
+    if (!existingContract) {
+      // Contract not found or belongs to another user.
+      // Use a generic error — do not distinguish "not found" from "access denied"
+      // to avoid leaking existence of other users' contracts.
+      throw new Error('Contract not found or access denied')
+    }
+  }
+
   // RLS ensures user can only update their own contracts
 
   const normalized = normalizeContractMutationInput(input)

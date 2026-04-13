@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils/date-utils";
-import { FileText, Calendar, CheckCircle, Mail, TrendingUp, AlertTriangle } from "lucide-react";
+import { FileText, Mail, TrendingUp, AlertTriangle } from "lucide-react";
 import { logger } from "@/lib/logger";
 import type { ContractSummary } from "@/types/contract";
 
@@ -27,22 +26,6 @@ interface KPICardData {
 // ============================================
 // Animation Utilities
 // ============================================
-const ANIMATIONS = {
-  pulse: "animate-pulse",
-  spin: "animate-spin",
-  bounce: "animate-bounce",
-  drawCheck: "animate-drawCheck",
-  slideUp: "transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-} as const;
-
-// Add custom keyframes for waveform animation (will be injected via style)
-const WAVEFORM_KEYFRAMES = `
-  @keyframes waveform {
-    0%, 100% { transform: scaleY(1); }
-    50% { transform: scaleY(0.6); }
-  }
-`;
-
 // ============================================
 // Creative Visual Components
 // ============================================
@@ -477,7 +460,7 @@ function DetailPanel({ data, isOpen }: DetailPanelProps) {
         
         {/* Mini cards breakdown */}
         <div className="grid grid-cols-4 gap-3 mb-4">
-          {["SaaS", "Services", "Licenses", "Other"].map((type, i) => (
+          {["SaaS", "Services", "Licenses", "Other"].map((type, _i) => (
             <div
               key={type}
               className="bg-white/[0.03] border border-white/[0.06] rounded-lg p-3 text-center"
@@ -542,16 +525,6 @@ function HorizontalKPICards({ data, onSegmentClick }: { data: KPICardData[]; onS
 // Mobile Compact Version
 // ============================================
 function MobileHorizontalKPI({ data }: { data: KPICardData[] }) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "success": return "#22c55e";
-      case "warning": return "#eab308";
-      case "info": return "#3b82f6";
-      case "danger": return "#ef4444";
-      default: return "#ffffff";
-    }
-  };
-
   return (
     <div className="overflow-x-auto -mx-4 px-4 pb-2">
       <div className="flex gap-2">

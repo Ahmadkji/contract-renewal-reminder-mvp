@@ -37,7 +37,7 @@ export function logEmailEvent(event: {
   type: 'sent' | 'failed' | 'retry' | 'rate_limited';
   emailData: CreateEmailOptions;
   result?: SendEmailResult;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }): void {
   const logEntry: EmailLogEntry = {
     timestamp: new Date().toISOString(),
@@ -71,7 +71,7 @@ export function logEmailEvent(event: {
 export function logEmailSent(
   emailData: CreateEmailOptions,
   result: SendEmailResult,
-  metadata?: any
+  metadata?: Record<string, unknown>
 ): void {
   logEmailEvent({
     type: 'sent',
@@ -90,7 +90,7 @@ export function logEmailSent(
 export function logEmailFailed(
   emailData: CreateEmailOptions,
   result: SendEmailResult,
-  metadata?: any
+  metadata?: Record<string, unknown>
 ): void {
   logEmailEvent({
     type: 'failed',

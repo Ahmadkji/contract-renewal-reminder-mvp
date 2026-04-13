@@ -4,7 +4,7 @@ import { LEGAL_LAST_UPDATED, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 export const metadata: Metadata = {
   title: "Refund Policy",
-  description: "Refund Policy for Renewly subscriptions.",
+  description: "Refund Policy for Doc Renewal subscriptions.",
 };
 
 export default function RefundPolicyPage() {
@@ -15,7 +15,7 @@ export default function RefundPolicyPage() {
           <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Legal</p>
           <h1 className="text-3xl font-semibold">Refund Policy</h1>
           <p className="text-sm text-slate-300">
-            This policy explains how refund requests are handled for Renewly paid plans.
+            This policy explains how refund requests are handled for Doc Renewal paid plans.
           </p>
           <p className="text-xs text-slate-400">Last updated: {LEGAL_LAST_UPDATED}</p>
         </header>
@@ -42,7 +42,7 @@ export default function RefundPolicyPage() {
         <section className="space-y-3 text-sm text-slate-300">
           <h2 className="text-xl font-semibold text-slate-100">How Refunds Are Processed</h2>
           <p>
-            Renewly uses Creem as merchant of record. Approved refunds are processed through Creem and
+            Doc Renewal uses Creem as merchant of record. Approved refunds are processed through Creem and
             returned to the original payment method according to network and bank timelines.
           </p>
           <p>

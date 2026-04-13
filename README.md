@@ -58,16 +58,16 @@ This scaffold provides a robust foundation built with:
 
 ```bash
 # Install dependencies
-bun install
+npm install
 
 # Start development server
-bun run dev
+npm run dev
 
 # Build for production
-bun run build
+npm run build
 
 # Start production server
-bun start
+npm run start
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see your application running.

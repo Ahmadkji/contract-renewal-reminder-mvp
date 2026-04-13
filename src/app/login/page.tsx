@@ -56,7 +56,7 @@ export default function LoginPage() {
       <div className="mx-auto flex min-h-[calc(100vh-6rem)] w-full max-w-md items-center">
         <div className="w-full rounded-3xl border border-white/[0.08] bg-[#141414] p-8 shadow-2xl shadow-black/30">
           <div className="mb-6">
-            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Renewly</p>
+            <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Doc Renewal</p>
             <h1 className="mt-3 text-3xl font-semibold">Sign in</h1>
             <p className="mt-2 text-sm leading-6 text-[#a3a3a3]">
               Use your Supabase account to access the dashboard.

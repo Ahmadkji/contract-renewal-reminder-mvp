@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createWritableClient } from '@/lib/supabase/server'
 
 function sanitizeNextPath(value: string | null): string {
   if (!value) {
@@ -25,12 +25,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(nextPath, request.url))
   }
 
-  const supabase = await createClient()
+  const supabase = await createWritableClient()
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {
     const failureUrl = new URL('/login', request.url)
     failureUrl.searchParams.set('error', 'auth_callback_failed')
+    return NextResponse.redirect(failureUrl)
+  }
+
+  // Verify cookies were actually written — if setAll silently failed,
+  // exchangeCodeForSession returns no error but the session is unusable.
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) {
+    const failureUrl = new URL('/login', request.url)
+    failureUrl.searchParams.set('error', 'session_setup_failed')
     return NextResponse.redirect(failureUrl)
   }
 

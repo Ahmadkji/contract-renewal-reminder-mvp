@@ -68,7 +68,6 @@ export function NavigationBar() {
       "benefits",
       "how-it-works",
       "pricing",
-      "testimonials",
     ];
 
     const observer = new IntersectionObserver(
@@ -106,7 +105,7 @@ export function NavigationBar() {
             <Clock className="w-5 h-5 text-cyan-500" />
           </div>
           <span className="font-display text-lg font-bold text-slate-100">
-            Renewly
+            Doc Renewal
           </span>
         </div>
         

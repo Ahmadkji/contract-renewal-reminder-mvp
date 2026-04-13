@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createWritableClient } from '@/lib/supabase/server'
 import { ensureProfileForUser } from '@/lib/db/profiles'
 import { loginSchema } from '@/lib/validation/auth-schema'
 import { validateOrigin, getOriginErrorResponse, logInvalidOriginAttempt } from '@/lib/security/csrf'
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = await createClient()
+    const supabase = await createWritableClient()
     const { data, error } = await supabase.auth.signInWithPassword({
       email: validated.data.email,
       password: validated.data.password,

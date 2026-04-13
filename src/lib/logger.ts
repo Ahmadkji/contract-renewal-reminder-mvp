@@ -110,7 +110,7 @@ export const logger = {
     const errorPayload = redactValue(error)
     writeLog('error', message, normalizedContext, errorPayload)
 
-    reportError(message, errorPayload, normalizedContext)
+    reportError(message, error, normalizedContext)
   },
 }
 

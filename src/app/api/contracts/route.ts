@@ -101,6 +101,22 @@ function mapContractMutationError(error: unknown): {
     }
   }
 
+  if (message.includes('Additional reminder recipients require an active premium subscription')) {
+    return {
+      status: 403,
+      code: 'FEATURE_REQUIRES_PREMIUM',
+      message: 'Additional reminder recipients require an active premium subscription.',
+    }
+  }
+
+  if (message.includes('Free email reminder quota exhausted')) {
+    return {
+      status: 403,
+      code: 'FREE_EMAIL_QUOTA_EXHAUSTED',
+      message: 'Free email reminder quota exhausted. Upgrade to continue sending reminders.',
+    }
+  }
+
   return {
     status: 500,
     code: 'CONTRACT_MUTATION_FAILED',
@@ -131,14 +147,14 @@ export async function GET(request: NextRequest) {
     if (sessionError) {
       console.error('[GET /api/contracts] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.' },
+        { success: false, error: 'Authentication error. Please sign in again.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - please sign in' },
+        { success: false, error: 'Unauthorized - please sign in', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
@@ -245,14 +261,14 @@ export async function POST(request: NextRequest) {
     if (sessionError) {
       console.error('[POST /api/contracts] Session error:', sessionError)
       return NextResponse.json(
-        { success: false, error: 'Authentication error. Please sign in again.' },
+        { success: false, error: 'Authentication error. Please sign in again.', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
 
     if (!user) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized - please sign in' },
+        { success: false, error: 'Unauthorized - please sign in', code: 'AUTH_REQUIRED' },
         { status: 401 }
       )
     }
@@ -262,7 +278,18 @@ export async function POST(request: NextRequest) {
       return getContractsRateLimitedResponse(userRate, CONTRACTS_MUTATION_RATE_LIMIT)
     }
 
-    const body = await request.json()
+    let body: unknown
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid JSON payload.',
+        },
+        { status: 400 }
+      )
+    }
     const validationResult = validateContractInput(body)
     if (!validationResult.success) {
       return NextResponse.json(

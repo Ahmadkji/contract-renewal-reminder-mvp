@@ -50,7 +50,7 @@ export function MobileMenu({ onAddClick, onClose }: MobileMenuProps) {
             <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
               <Clock className="w-4 h-4 text-white" />
             </div>
-            <span className="font-semibold text-white">Renewly</span>
+            <span className="font-semibold text-white">Doc Renewal</span>
           </Link>
           <button
             onClick={onClose}

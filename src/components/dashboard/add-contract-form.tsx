@@ -19,6 +19,7 @@ import {
   CURRENCIES,
   REMINDER_OPTIONS,
 } from "./add-contract-form-constants";
+import { getContractSubmissionErrorDetails } from "./contract-submission-errors";
 import {
   CurrencyInput,
   DatePicker,
@@ -93,58 +94,9 @@ export function AddContractForm({
       // Success toast is handled by useCreateContract mutation in layout.tsx
       onOpenChange(false);
     } catch (error) {
-      // FIX #14: Add specific error handling for different error types
-      let errorMessage = "Please try again.";
-      let errorTitle = "Failed to create contract";
-      const errorName = error instanceof Error ? error.name : "UnknownError";
-      
-      if (error instanceof Error) {
-        errorMessage = error.message;
-        const normalizedMessage = errorMessage.toLowerCase();
-        
-        // Distinguish between error types for better UX
-        if (errorMessage.includes('Authentication') || errorMessage.includes('Unauthorized')) {
-          errorTitle = "Authentication required";
-          errorMessage = "Please sign in and try again.";
-        } else if (normalizedMessage.includes('free email reminder quota exhausted')) {
-          errorTitle = "Free reminder limit reached";
-          errorMessage =
-            "Your free plan includes 5 reminder emails. Upgrade in Billing to continue reminder delivery.";
-        } else if (
-          normalizedMessage.includes('additional reminder recipients require an active premium subscription')
-        ) {
-          errorTitle = "Upgrade required";
-          errorMessage =
-            "Free reminder emails send only to your account email. Upgrade to add extra reminder recipients.";
-        } else if (
-          normalizedMessage.includes('premium subscription') ||
-          normalizedMessage.includes('feature_requires_premium')
-        ) {
-          errorTitle = "Upgrade required";
-          errorMessage =
-            "Unlimited reminder emails and extra recipients are available on premium. Adjust reminder settings or upgrade in Billing.";
-        } else if (errorMessage.includes('Validation') || errorMessage.includes('required')) {
-          errorTitle = "Validation error";
-          errorMessage = "Please check your form data and try again.";
-        } else if (errorMessage.includes('vendor contact')) {
-          errorTitle = "Vendor contact error";
-          errorMessage = "Could not save vendor contact. Please check the email format.";
-        } else if (normalizedMessage.includes('reminder')) {
-          errorTitle = "Reminder error";
-          // Preserve backend context instead of masking with a generic message.
-          errorMessage = error.message;
-        } else if (errorMessage.includes('database') || errorMessage.includes('constraint')) {
-          errorTitle = "Database error";
-          errorMessage = "A database error occurred. Please try again.";
-        }
-      }
-      
-      console.error('[Contract Form] Submission failed:', {
-        errorName,
-        errorTitle,
-        errorMessage,
-      });
-      
+      const { title: errorTitle, message: errorMessage } =
+        getContractSubmissionErrorDetails(error);
+
       toastFn.error(errorTitle, errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -245,11 +197,12 @@ export function AddContractForm({
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField label="Contact Person">
+              <FormField label="Contact Person" error={errors.vendorContact}>
                 <Input
                   placeholder="e.g., John Smith"
                   value={formData.vendorContact}
                   onChange={(e) => updateField("vendorContact", e.target.value)}
+                  error={!!errors.vendorContact}
                 />
               </FormField>
 

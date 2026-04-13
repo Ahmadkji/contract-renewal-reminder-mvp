@@ -44,8 +44,40 @@ export class CreemRequestError extends Error {
   }
 }
 
+function normalizeCreemApiBaseUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/+$/, '')
+  if (!trimmed) {
+    return 'https://api.creem.io'
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    parsed = new URL(`https://${trimmed}`)
+  }
+
+  const pathname = parsed.pathname.replace(/\/+$/, '')
+  if (pathname === '/v1') {
+    parsed.pathname = ''
+  } else if (pathname.endsWith('/v1')) {
+    parsed.pathname = pathname.slice(0, -3)
+  }
+
+  return parsed.toString().replace(/\/+$/, '')
+}
+
 function getCreemApiBaseUrl(): string {
-  return env.CREEM_API_BASE_URL || 'https://api.creem.io'
+  return normalizeCreemApiBaseUrl(env.CREEM_API_BASE_URL || 'https://api.creem.io')
+}
+
+function getEnvNumber(name: string, fallback: number, min: number, max: number): number {
+  const parsed = Number(process.env[name])
+  if (!Number.isFinite(parsed)) {
+    return fallback
+  }
+
+  return Math.max(min, Math.min(max, Math.trunc(parsed)))
 }
 
 function getApiKey(): string {
@@ -83,8 +115,13 @@ const CREEM_MAX_RETRY_ATTEMPTS = 2
 const CREEM_BASE_RETRY_DELAY_MS = 250
 const CREEM_MAX_RETRY_DELAY_MS = 5_000
 const CREEM_RETRY_JITTER_MS = 200
-const CREEM_CIRCUIT_OPEN_MS = 10_000
-const CREEM_CIRCUIT_FAILURE_THRESHOLD = 5
+const CREEM_CIRCUIT_OPEN_MS = getEnvNumber('CREEM_CIRCUIT_OPEN_MS', 10_000, 1_000, 60_000)
+const CREEM_CIRCUIT_FAILURE_THRESHOLD = getEnvNumber(
+  'CREEM_CIRCUIT_FAILURE_THRESHOLD',
+  5,
+  1,
+  20
+)
 
 const circuitState = {
   retryableFailures: 0,

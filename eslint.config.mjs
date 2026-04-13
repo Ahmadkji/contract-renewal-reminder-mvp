@@ -23,7 +23,7 @@ const unusedVarsRule = [
 
 const strictUnusedVarsRule = ['error', unusedVarsRule[1]]
 
-export default [
+const config = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
@@ -77,3 +77,5 @@ export default [
     ],
   },
 ]
+
+export default config

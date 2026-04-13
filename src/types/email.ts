@@ -65,7 +65,7 @@ export interface SendEmailResult {
   success: boolean;
   
   /** Response data from Resend API (if successful) */
-  data?: any;
+  data?: unknown;
   
   /** Error message (if failed) */
   error?: string;
@@ -77,14 +77,14 @@ export interface SendEmailResult {
   retryAfterSeconds?: number;
   
   /** Additional error details */
-  details?: any;
+  details?: unknown;
 }
 
 /**
  * Email template props interface
  */
 export interface EmailTemplateProps {
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -118,11 +118,11 @@ export interface EmailLogEntry {
   type: 'sent' | 'failed' | 'retry' | 'rate_limited';
   
   /** Email data */
-  emailData: any;
+  emailData: unknown;
   
   /** Send result */
   result?: SendEmailResult;
   
   /** Additional metadata */
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
