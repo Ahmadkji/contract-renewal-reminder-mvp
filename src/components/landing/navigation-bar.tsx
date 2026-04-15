@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ANIMATION_DELAY_MS } from "@/lib/constants";
+import { BILLING_ENABLED } from "@/lib/billing/mode";
 
 interface NavLink {
   label: string;
@@ -20,7 +21,7 @@ const NAV_LINKS: NavLink[] = [
   { label: "Features", href: "#features" },
   { label: "Benefits", href: "#benefits" },
   { label: "How It Works", href: "#how-it-works" },
-  { label: "Pricing", href: "#pricing" },
+  ...(BILLING_ENABLED ? [{ label: "Pricing", href: "#pricing" }] : []),
 ];
 
 export function NavigationBar() {
@@ -67,7 +68,7 @@ export function NavigationBar() {
       "features",
       "benefits",
       "how-it-works",
-      "pricing",
+      ...(BILLING_ENABLED ? ["pricing"] : []),
     ];
 
     const observer = new IntersectionObserver(
@@ -170,25 +171,27 @@ export function NavigationBar() {
       
       {/* Mobile Menu - Full Screen Overlay */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-slate-950/95 backdrop-blur-lg z-40">
+        <div className="md:hidden fixed inset-0 top-16 bg-slate-950/80 backdrop-blur-xl z-40">
           <div className="flex flex-col items-center justify-center h-full gap-8 px-4">
-            {NAV_LINKS.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-2xl font-medium text-slate-300 hover:text-cyan-400 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
-            
+            <div className="flex flex-col items-center gap-6 p-6 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl">
+              {NAV_LINKS.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="text-xl font-medium text-slate-300 hover:text-cyan-400 transition-colors px-4 py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {link.label}
+                </a>
+              ))}
+            </div>
+
             {/* Mobile Auth Buttons */}
-            <div className="flex flex-col gap-4 w-full max-w-xs mt-4">
+            <div className="flex flex-col gap-4 w-full max-w-xs p-4 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl">
               <Button
                 asChild
                 variant="outline"
-                className="w-full border-slate-700 text-slate-300 hover:bg-slate-800"
+                className="w-full border-slate-600 text-slate-300 hover:bg-slate-800 hover:border-slate-500"
               >
                 <Link
                   href="/login"

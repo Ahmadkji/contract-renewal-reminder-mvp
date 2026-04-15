@@ -18,6 +18,7 @@ import {
 import { validateContractInput } from '@/lib/validation/contract-schema'
 import { logger } from '@/lib/logger'
 import { getRequestIdFromHeaders } from '@/lib/observability/request-id'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 const ENABLE_CONTRACTS_TIMING_LOGS = process.env.CONTRACTS_API_TIMING_LOGS === '1'
 const CONTRACTS_LIST_RATE_LIMIT: RateLimitOptions = {
@@ -84,6 +85,19 @@ function mapContractMutationError(error: unknown): {
   message: string
 } {
   const message = error instanceof Error ? error.message : ''
+  const billingGateMessage =
+    message.includes('Free plan contract limit reached') ||
+    message.includes('Email reminders require an active premium subscription') ||
+    message.includes('Additional reminder recipients require an active premium subscription') ||
+    message.includes('Free email reminder quota exhausted')
+
+  if (!BILLING_ENABLED && billingGateMessage) {
+    return {
+      status: 503,
+      code: 'FREE_MODE_MIGRATION_PENDING',
+      message: 'Free mode is enabled, but the Supabase free-mode migration has not been applied yet.',
+    }
+  }
 
   if (message.includes('Free plan contract limit reached')) {
     return {

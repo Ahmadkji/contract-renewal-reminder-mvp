@@ -11,9 +11,9 @@ export const WORKFLOW_HIGHLIGHTS = [
     featured: true,
   },
   {
-    title: 'Upgrade when premium features are needed',
-    description: 'Unlock unlimited reminder emails, extra recipients, and CSV export with monthly or yearly billing plans.',
-    tag: 'Flexible Billing',
+    title: 'Use every feature from day one',
+    description: 'Unlimited reminder emails, extra recipients, and CSV export are included for all users.',
+    tag: 'Free Access',
   },
 ] as const
 
@@ -24,7 +24,7 @@ export const FAQ_ITEMS = [
   },
   {
     question: 'What if I have 500+ contracts?',
-    answer: 'Paid plans support unlimited contracts. Free plan usage is capped by entitlement limits.',
+    answer: 'You can manage large contract volumes with no plan-based contract cap.',
   },
   {
     question: 'Do you store my contract files?',
@@ -36,10 +36,10 @@ export const FAQ_ITEMS = [
   },
   {
     question: 'Is there a free plan?',
-    answer: 'Yes. You can start on the free plan with up to 5 contracts and 5 reminder emails before upgrading.',
+    answer: 'Yes. The MVP is currently free to use with full feature access.',
   },
   {
-    question: 'Which premium features are available?',
-    answer: 'Premium unlocks unlimited reminder emails, additional reminder recipients, CSV export, and removes the free-plan contract cap.',
+    question: 'Which features are included?',
+    answer: 'Unlimited reminder emails, additional reminder recipients, CSV export, and unlimited contracts are all included.',
   },
 ] as const

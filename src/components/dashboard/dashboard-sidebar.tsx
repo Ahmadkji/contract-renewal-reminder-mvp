@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { BILLING_ENABLED } from "@/lib/billing/mode";
 
 interface SidebarProps {
   expanded: boolean;
@@ -25,7 +26,9 @@ export function DashboardSidebar({ expanded, setExpanded, onAddClick }: SidebarP
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home, href: "/dashboard" },
     { id: "contracts", label: "Contracts", icon: FileText, href: "/dashboard/contracts" },
-    { id: "billing", label: "Billing", icon: CreditCard, href: "/dashboard/billing" },
+    ...(BILLING_ENABLED
+      ? [{ id: "billing", label: "Billing", icon: CreditCard, href: "/dashboard/billing" }]
+      : []),
   ];
 
   const actionItems = [

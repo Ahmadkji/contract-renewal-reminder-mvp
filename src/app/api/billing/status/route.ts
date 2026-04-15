@@ -5,6 +5,7 @@ import { createAdminClient, validateSession } from '@/lib/supabase/server'
 import { getContractLimit, getOrCreateEntitlementSnapshot } from '@/lib/billing/entitlements'
 import { checkRateLimit, getRateLimitHeaders, getRequestIp } from '@/lib/security/rate-limit'
 import { getRequestIdFromHeaders } from '@/lib/observability/request-id'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 const STATUS_RATE_LIMIT = {
   limit: 60,
@@ -55,6 +56,40 @@ export async function GET(request: NextRequest) {
           status: 429,
           headers: {
             ...getRateLimitHeaders(userRate, STATUS_RATE_LIMIT),
+            'X-Request-Id': requestId,
+          },
+        }
+      )
+    }
+
+    if (!BILLING_ENABLED) {
+      return NextResponse.json(
+        {
+          success: true,
+          data: {
+            planCode: null,
+            subscriptionStatus: 'mvp_free_mode',
+            isPremium: true,
+            features: {
+              emailReminders: true,
+              csvExport: true,
+            },
+            usage: {
+              contractsLimit: null,
+            },
+            effectiveTo: null,
+            currentPeriodEndDate: null,
+            currentPeriodStartDate: null,
+            cancelAtPeriodEnd: false,
+            canceledAt: null,
+            trialEnd: null,
+            computedAt: new Date().toISOString(),
+          },
+        },
+        {
+          headers: {
+            ...getRateLimitHeaders(userRate, STATUS_RATE_LIMIT),
+            'Cache-Control': 'private, no-store, no-cache, must-revalidate',
             'X-Request-Id': requestId,
           },
         }

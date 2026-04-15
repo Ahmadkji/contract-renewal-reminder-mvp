@@ -3,6 +3,7 @@ import { unstable_rethrow } from 'next/navigation'
 import { validateSession } from '@/lib/supabase/server'
 import { getAllContracts } from '@/lib/db/contracts'
 import { canUseFeature, getOrCreateEntitlementSnapshot } from '@/lib/billing/entitlements'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 const FORMULA_PREFIX_PATTERN = /^[\t\r ]*[=+\-@]/
 
@@ -67,16 +68,18 @@ export async function GET(_request: NextRequest) {
       )
     }
 
-    const snapshot = await getOrCreateEntitlementSnapshot(user.id, 'contracts_export')
-    if (!canUseFeature(snapshot, 'csvExport')) {
-      return NextResponse.json(
-        {
-          success: false,
-          code: 'FEATURE_REQUIRES_PREMIUM',
-          error: 'CSV export requires an active premium subscription.',
-        },
-        { status: 403 }
-      )
+    if (BILLING_ENABLED) {
+      const snapshot = await getOrCreateEntitlementSnapshot(user.id, 'contracts_export')
+      if (!canUseFeature(snapshot, 'csvExport')) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: 'FEATURE_REQUIRES_PREMIUM',
+            error: 'CSV export requires an active premium subscription.',
+          },
+          { status: 403 }
+        )
+      }
     }
 
     const result = await getAllContracts(user.id, 1, 5000)

@@ -4,6 +4,7 @@ import { createAdminClient, validateSession } from '@/lib/supabase/server'
 import { createCreemCustomerBillingPortal } from '@/lib/billing/creem-client'
 import { validateOrigin, getOriginErrorResponse, logInvalidOriginAttempt } from '@/lib/security/csrf'
 import { checkRateLimit, getRateLimitHeaders, getRequestIp } from '@/lib/security/rate-limit'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 const PORTAL_RATE_LIMIT = {
   limit: 12,
@@ -53,6 +54,17 @@ function extractPortalUrl(responsePayload: unknown): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!BILLING_ENABLED) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: 'BILLING_DISABLED',
+          error: 'Billing portal is disabled while the MVP is in free mode.',
+        },
+        { status: 403 }
+      )
+    }
+
     if (!validateOrigin(request)) {
       logInvalidOriginAttempt(request, 'POST /api/billing/portal')
       return getOriginErrorResponse()

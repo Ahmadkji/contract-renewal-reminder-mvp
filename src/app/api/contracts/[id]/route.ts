@@ -10,6 +10,7 @@ import {
   type RateLimitResult,
 } from '@/lib/security/rate-limit'
 import { validateContractInput } from '@/lib/validation/contract-schema'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 const CONTRACT_DETAIL_RATE_LIMIT: RateLimitOptions = {
   limit: 120,
@@ -52,6 +53,18 @@ function mapContractUpdateError(error: unknown): {
   message: string
 } {
   const message = error instanceof Error ? error.message : ''
+  const billingGateMessage =
+    message.includes('Email reminders require an active premium subscription') ||
+    message.includes('Additional reminder recipients require an active premium subscription') ||
+    message.includes('Free email reminder quota exhausted')
+
+  if (!BILLING_ENABLED && billingGateMessage) {
+    return {
+      status: 503,
+      code: 'FREE_MODE_MIGRATION_PENDING',
+      message: 'Free mode is enabled, but the Supabase free-mode migration has not been applied yet.',
+    }
+  }
 
   // Pre-flight errors from updateContract()
   if (message === 'Contract not found' || message.includes('Contract not found or access denied')) {

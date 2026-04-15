@@ -52,9 +52,11 @@ import {
   ANIMATION_DELAY_VERY_LONG_MS,
   TRANSITION_DELAY_MS,
 } from "@/lib/constants";
+import { DEFAULT_MOBILE_BREAKPOINT, useIsMobile } from "@/hooks/use-mobile";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site-url";
 import { FAQ_ITEMS, WORKFLOW_HIGHLIGHTS } from "@/components/landing/homepage-static-content";
+import { BILLING_ENABLED } from "@/lib/billing/mode";
 
 const HOMEPAGE_STRUCTURED_DATA = {
   "@context": "https://schema.org",
@@ -122,6 +124,7 @@ function DottedBackground() {
 
 // Navigation Bar Component with scroll-aware behavior
 function NavigationBar() {
+  const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
@@ -138,24 +141,70 @@ function NavigationBar() {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
 
-      // Hide/show on scroll direction
-      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-        setIsHidden(true);
-      } else {
+      if (mobileMenuOpen) {
         setIsHidden(false);
+      } else {
+        // Hide/show on scroll direction
+        if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+          setIsHidden(true);
+        } else {
+          setIsHidden(false);
+        }
       }
+
+      // Hide/show on scroll direction
       lastScrollY.current = currentScrollY;
 
       // Calculate scroll progress
       const docHeight =
         document.documentElement.scrollHeight - window.innerHeight;
-      const progress = (currentScrollY / docHeight) * 100;
+      const progress = docHeight > 0 ? (currentScrollY / docHeight) * 100 : 0;
       setScrollProgress(progress);
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia(`(min-width: ${DEFAULT_MOBILE_BREAKPOINT}px)`);
+    const handleChange = (event: MediaQueryListEvent) => {
+      if (event.matches) {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileMenuOpen]);
 
   // Active section detection
   useEffect(() => {
@@ -163,7 +212,7 @@ function NavigationBar() {
       "features",
       "benefits",
       "how-it-works",
-      "pricing",
+      ...(BILLING_ENABLED ? ["pricing"] : []),
     ];
 
     const observer = new IntersectionObserver(
@@ -189,7 +238,7 @@ function NavigationBar() {
     { label: "Features", href: "#features" },
     { label: "Benefits", href: "#benefits" },
     { label: "How It Works", href: "#how-it-works" },
-    { label: "Pricing", href: "#pricing" },
+    ...(BILLING_ENABLED ? [{ label: "Pricing", href: "#pricing" }] : []),
   ];
 
   return (
@@ -261,6 +310,8 @@ function NavigationBar() {
             className="md:hidden w-10 h-10 flex items-center justify-center text-slate-400 hover:text-slate-100 transition-colors rounded-lg hover:bg-slate-800/50 focus-ring"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="landing-mobile-menu"
           >
             {mobileMenuOpen ? (
               <X className="w-5 h-5" />
@@ -272,33 +323,53 @@ function NavigationBar() {
       </div>
 
       {/* Mobile Menu - Full Screen Overlay */}
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 top-16 bg-slate-950/95 backdrop-blur-lg z-40">
-          <div className="flex flex-col items-center justify-center h-full gap-8 px-4">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-2xl font-medium text-slate-300 hover:text-cyan-400 transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {link.label}
-              </a>
-            ))}
-            <hr className="w-48 border-slate-800" />
-            <Link
-              href="/login"
-              className="w-48 h-12 text-base text-slate-300 border border-slate-700 rounded-full hover:border-slate-600 transition-all focus-ring flex items-center justify-center"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/signup"
-              className="w-48 h-12 text-base text-white bg-cyan-500 rounded-full hover:bg-cyan-600 transition-all focus-ring flex items-center justify-center gap-2"
-            >
-              Get Started
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+      {mobileMenuOpen && isMobile && (
+        <div
+          id="landing-mobile-menu"
+          className="md:hidden fixed inset-0 top-16 bg-black/65 backdrop-blur-md z-40 animate-in fade-in duration-200"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Main menu"
+        >
+          <div className="h-[calc(100vh-4rem)] overflow-y-auto px-4 py-5">
+            <div className="mx-auto w-full max-w-sm rounded-3xl border border-white/20 bg-slate-950/78 backdrop-blur-2xl shadow-[0_16px_60px_rgba(2,6,23,0.72)] p-4">
+              <div className="space-y-2">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    className={`min-h-[48px] w-full rounded-xl border px-4 py-3 text-base font-medium transition-all flex items-center ${
+                      activeSection === link.href.slice(1)
+                        ? "border-cyan-400/55 bg-cyan-400/16 text-cyan-100"
+                        : "border-white/15 bg-slate-900/65 text-slate-100 hover:bg-slate-900/80 hover:border-white/25"
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+
+              <div className="my-4 h-px bg-white/15" />
+
+              <div className="grid grid-cols-1 gap-3">
+                <Link
+                  href="/login"
+                  className="w-full h-12 text-base text-white bg-slate-800/75 border border-white/30 rounded-xl hover:bg-slate-700/85 hover:border-white/40 transition-all focus-ring flex items-center justify-center"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Sign In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="w-full h-12 text-base text-white font-semibold bg-cyan-500 rounded-xl border border-cyan-300/70 hover:bg-cyan-400 transition-all focus-ring flex items-center justify-center gap-2 shadow-[0_10px_30px_rgba(6,182,212,0.3)]"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -498,7 +569,7 @@ function HeroSection() {
       id="contract-renewal-hero"
       aria-labelledby="hero-title"
       aria-describedby="hero-subtitle"
-      className="relative z-10 flex min-h-[clamp(640px,82vh,860px)] items-center justify-center overflow-hidden bg-[#06060A] px-4 sm:px-6 lg:px-8"
+      className="relative z-10 flex min-h-[clamp(560px,82vh,860px)] items-center justify-center overflow-hidden bg-[#06060A] px-4 pt-16 sm:px-6 lg:px-8"
     >
       <canvas
         ref={canvasRef}
@@ -506,19 +577,19 @@ function HeroSection() {
         aria-hidden="true"
       />
 
-      <header className="relative z-[2] mx-auto flex w-full max-w-[700px] flex-col items-center px-4 text-center sm:px-12">
+      <header className="relative z-[2] mx-auto flex w-full max-w-[700px] flex-col items-center px-2 text-center sm:px-12">
         <div className="relative mb-8 flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(212,168,64,0.4)]">
           <div className="h-5 w-5 rotate-45 border border-[rgba(212,168,64,0.6)]" />
           <div className="absolute h-16 w-16 rounded-full border border-[rgba(212,168,64,0.12)]" />
         </div>
 
-        <div className="mb-7 text-[10px] uppercase tracking-[0.55em] text-[rgba(212,168,64,0.55)]">
+        <div className="mb-5 text-[9px] uppercase tracking-[0.45em] text-[rgba(212,168,64,0.55)] sm:mb-7 sm:text-[10px] sm:tracking-[0.55em]">
             Doc Renewal · Contract Renewal Tracker
         </div>
 
         <h1
           id="hero-title"
-          className="mb-6 text-[clamp(46px,6vw,86px)] font-light leading-[1.1] tracking-[0.03em] text-[#F0E8D0]"
+          className="mb-5 text-[clamp(34px,9vw,86px)] font-light leading-[1.12] tracking-[0.03em] text-[#F0E8D0] sm:mb-6"
           style={{ fontFamily: "Cormorant Garamond, Cormorant, Georgia, serif" }}
         >
           Never miss a
@@ -530,7 +601,7 @@ function HeroSection() {
 
         <p
           id="hero-subtitle"
-          className="max-w-[560px] text-[17px] leading-[1.8] text-[rgba(240,232,208,0.65)]"
+          className="max-w-[560px] text-[15px] leading-[1.65] text-[rgba(240,232,208,0.65)] sm:text-[17px] sm:leading-[1.8]"
         >
           Doc Renewal helps small teams track contracts, send reminder emails before
           due dates, and manage all renewals in one simple dashboard.
@@ -1136,14 +1207,14 @@ function BenefitsGridSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="benefits" ref={ref} className="relative z-10 bg-slate-950 py-24 px-4 sm:px-6 lg:px-8">
+    <section id="benefits" ref={ref} className="relative z-10 bg-slate-950 py-20 sm:py-24 px-4 sm:px-6 lg:px-8">
       {/* Dot pattern background */}
       <div className="absolute inset-0 dotted-background opacity-10" />
 
       <div className="max-w-[1200px] mx-auto relative">
         {/* Header */}
         <div className={`text-center mb-16 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
-          <h2 className="font-display text-4xl font-bold text-white mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-4">
             Why teams choose Doc Renewal
           </h2>
           <p className="text-lg text-slate-400">
@@ -1253,7 +1324,7 @@ function AutomatedRemindersBlock() {
               {[
                 "Email reminders with configurable schedules",
                 "Additional notification recipients supported",
-                "5 free reminder emails included before upgrade",
+                "Unlimited reminder emails included",
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
@@ -1463,11 +1534,11 @@ function WorkflowHighlightsSection() {
   const { ref, isVisible } = useScrollReveal();
 
   return (
-    <section id="workflow-highlights" ref={ref} className="relative z-10 py-24 sm:py-32 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0f172a, #020617)" }}>
+    <section id="workflow-highlights" ref={ref} className="relative z-10 py-20 sm:py-32 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0f172a, #020617)" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
-          <h2 className="font-display text-4xl font-bold text-white mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-4">
             Workflow highlights
           </h2>
           <p className="text-slate-400 text-lg">
@@ -1856,7 +1927,7 @@ function ConnectedPathSection() {
     <section
       id="how-it-works"
       ref={ref}
-      className="relative z-10 bg-slate-950 py-28 px-4 sm:px-6 lg:px-8"
+      className="relative z-10 bg-slate-950 py-20 sm:py-28 px-4 sm:px-6 lg:px-8"
     >
       <div className="max-w-[1000px] mx-auto relative">
         {/* Header */}
@@ -1868,7 +1939,7 @@ function ConnectedPathSection() {
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-cyan-500 mb-3">
             SETUP
           </p>
-          <h2 className="font-display text-[44px] font-bold text-slate-100 mb-4">
+          <h2 className="font-display text-3xl sm:text-[44px] font-bold text-slate-100 mb-4">
             Get started in 3 minutes
           </h2>
           <p className="text-base text-slate-400">
@@ -2029,11 +2100,11 @@ function ComparisonSection() {
   };
 
   return (
-    <section ref={ref} className="relative z-10 bg-slate-900 py-24 px-4 sm:px-6 lg:px-8">
+    <section ref={ref} className="relative z-10 bg-slate-900 py-20 sm:py-24 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className={`text-center mb-12 ${isVisible ? "scroll-reveal visible" : "scroll-reveal"}`}>
-          <h2 className="font-display text-4xl font-bold text-white mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-white mb-4">
             Where Doc Renewal is focused
           </h2>
           <p className="text-lg text-slate-400">
@@ -3391,7 +3462,7 @@ function FinalCTASection() {
           }`}
           style={{ animationDelay: "250ms" }}
         >
-          Start with the free plan and upgrade to unlock unlimited reminders, additional recipients, and exports.
+          Start free with unlimited reminders, additional recipients, and exports included.
         </p>
 
         {/* Form */}
@@ -3435,11 +3506,11 @@ function FinalCTASection() {
         >
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            Free plan available
+            Unlimited access included
           </span>
           <span className="flex items-center gap-1.5">
             <Check className="w-3.5 h-3.5 text-emerald-400" />
-            Cancel anytime
+            No credit card required
           </span>
         </div>
       </div>
@@ -3618,7 +3689,7 @@ export default function Home() {
       <WhoUsesItSection />
       <PainToSolutionSection />
       <IndustryFitSection />
-      <PricingSection />
+      {BILLING_ENABLED ? <PricingSection /> : null}
 
       {/* Comparison & FAQ */}
       <ComparisonSection />

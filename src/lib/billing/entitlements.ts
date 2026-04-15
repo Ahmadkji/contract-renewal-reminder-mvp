@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { BILLING_ENABLED } from '@/lib/billing/mode'
 
 export type PremiumFeature = 'emailReminders' | 'csvExport'
 
@@ -58,6 +59,10 @@ export async function getOrCreateEntitlementSnapshot(userId: string, reason: str
 }
 
 export function canUseFeature(snapshot: EntitlementSnapshot, feature: PremiumFeature): boolean {
+  if (!BILLING_ENABLED) {
+    return true
+  }
+
   if (!snapshot.is_premium) {
     return false
   }
@@ -74,6 +79,10 @@ export function canUseFeature(snapshot: EntitlementSnapshot, feature: PremiumFea
 }
 
 export function getContractLimit(snapshot: EntitlementSnapshot): number | null {
+  if (!BILLING_ENABLED) {
+    return null
+  }
+
   if (snapshot.is_premium) {
     return null
   }

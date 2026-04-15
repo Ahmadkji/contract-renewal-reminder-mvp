@@ -26,6 +26,17 @@ export function getContractSubmissionErrorDetails(
     }
   }
 
+  if (
+    normalizedMessage.includes('free_mode_migration_pending') ||
+    normalizedMessage.includes('supabase free-mode migration has not been applied')
+  ) {
+    return {
+      title: 'Setup required',
+      message:
+        'Free mode is enabled in the app, but the Supabase free-mode migration is still pending.',
+    }
+  }
+
   if (normalizedMessage.includes('free email reminder quota exhausted')) {
     return {
       title: 'Free reminder limit reached',

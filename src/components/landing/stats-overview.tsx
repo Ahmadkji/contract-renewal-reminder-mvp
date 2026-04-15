@@ -63,7 +63,7 @@ export function StatsOverview() {
       icon: <LayoutDashboard className="w-6 h-6 text-cyan-500" />,
       iconColor: "bg-cyan-500/20",
       metric: "Review",
-      label: "Billing and export controls",
+      label: "Export and sharing controls",
       delay: "card-stagger-3",
     },
   ];
