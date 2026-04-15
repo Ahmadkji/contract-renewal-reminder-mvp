@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
 
@@ -26,6 +27,25 @@ export function SlideOverPanel({
   footer,
   width = "lg",
 }: SlideOverPanelProps) {
+  const [mounted, setMounted] = React.useState(false)
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open])
+
   const widthClasses = {
     sm: "max-w-sm",
     md: "max-w-md",
@@ -34,12 +54,16 @@ export function SlideOverPanel({
     "2xl": "max-w-4xl",
   }
 
-  return (
+  if (!mounted) {
+    return null
+  }
+
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-all duration-300",
+          "fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm transition-all duration-300",
           open ? "opacity-100" : "opacity-0 pointer-events-none"
         )}
         onClick={() => onOpenChange(false)}
@@ -48,10 +72,12 @@ export function SlideOverPanel({
       {/* Panel */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 mx-auto flex max-h-[92vh] w-full flex-col bg-[#0a0a0a] shadow-2xl transition-transform duration-300 ease-out",
-          "border-t border-white/10 rounded-t-2xl sm:bottom-4 sm:rounded-2xl sm:border",
+          "fixed inset-x-0 bottom-0 z-[130] mx-auto flex max-h-[92vh] w-full flex-col bg-[#0a0a0a] shadow-2xl transform-gpu transition-all duration-300 ease-out",
+          "border-t border-white/10 rounded-t-2xl sm:inset-x-auto sm:left-1/2 sm:top-1/2 sm:bottom-auto sm:-translate-x-1/2 sm:rounded-2xl sm:border sm:w-[95vw]",
           widthClasses[width],
-          open ? "translate-y-0" : "translate-y-full"
+          open
+            ? "translate-y-0 opacity-100 sm:-translate-y-1/2 sm:scale-100"
+            : "translate-y-full opacity-0 pointer-events-none sm:-translate-y-[45%] sm:scale-95"
         )}
       >
         {/* Drag Handle */}
@@ -60,7 +86,7 @@ export function SlideOverPanel({
         </div>
 
         {/* Header */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
+        <div className="flex items-center justify-between h-16 px-4 sm:px-6 border-b border-white/10">
           <div>
             <h2 className="text-lg font-semibold text-white">{title}</h2>
             {description && (
@@ -69,25 +95,26 @@ export function SlideOverPanel({
           </div>
           <button
             onClick={() => onOpenChange(false)}
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+            className="w-10 h-10 flex items-center justify-center rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 pb-20">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20">
           {children}
         </div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center gap-3 h-16 px-6 border-t border-white/10 bg-[#0a0a0a]">
+          <div className="flex items-center gap-3 h-14 px-6 border-t border-white/10 bg-[#0a0a0a]">
             {footer}
           </div>
         )}
       </div>
-    </>
+    </>,
+    document.body
   )
 }
 

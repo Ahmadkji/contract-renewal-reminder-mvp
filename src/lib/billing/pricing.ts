@@ -13,6 +13,7 @@ export interface BillingPricingPlan {
   productId: string
   monthlyEquivalentCents: number
   yearlySavingsPercent: number
+  features: string[]
 }
 
 export interface BillingPricingSnapshot {
@@ -30,6 +31,7 @@ interface BasePlanPricing {
   currency: string
   billingPeriod: string
   productId: string
+  features: string[]
 }
 
 interface CachedPricingSnapshot {
@@ -45,12 +47,29 @@ const FALLBACK_PLAN_PRICING: Record<BillingPlanCode, Omit<BasePlanPricing, 'plan
     priceCents: 1900,
     currency: 'USD',
     billingPeriod: 'every-month',
+    features: [
+      'Remove free-plan limits with unlimited contracts',
+      'Send unlimited renewal reminder emails',
+      'Add additional reminder recipients',
+      'Export contracts to CSV',
+      'Manage plan and payment method in billing portal',
+      'Month-to-month billing flexibility',
+    ],
   },
   yearly: {
     displayName: 'Yearly',
     priceCents: 19000,
     currency: 'USD',
     billingPeriod: 'every-year',
+    features: [
+      'Everything in Monthly',
+      'Remove free-plan limits with unlimited contracts',
+      'Send unlimited renewal reminder emails',
+      'Add additional reminder recipients',
+      'Export contracts to CSV',
+      'Manage plan and payment method in billing portal',
+      'Lower effective monthly cost with annual billing',
+    ],
   },
 }
 
@@ -106,7 +125,32 @@ function createFallbackPlan(planCode: BillingPlanCode, productId: string): BaseP
     currency: fallback.currency,
     billingPeriod: fallback.billingPeriod,
     productId,
+    features: fallback.features,
   }
+}
+
+function parseFeaturesFromProduct(product: Record<string, unknown>): string[] {
+  // Try to extract features from Creem product metadata
+  // Creem stores features in various ways: metadata.features, description, etc.
+  
+  // Check for metadata.features array
+  const metadata = product.metadata as Record<string, unknown> | undefined
+  if (metadata?.features && Array.isArray(metadata.features)) {
+    return metadata.features
+      .filter((f): f is string => typeof f === 'string' && f.trim().length > 0)
+      .map(f => f.trim())
+  }
+  
+  // Check for features as a comma-separated string in metadata
+  if (metadata?.features && typeof metadata.features === 'string') {
+    return metadata.features
+      .split(',')
+      .map(f => f.trim())
+      .filter(f => f.length > 0)
+  }
+  
+  // No features found in product data
+  return []
 }
 
 function normalizeLivePlan(
@@ -140,6 +184,8 @@ function normalizeLivePlan(
       ? product.billing_period.trim()
       : fallback.billingPeriod
 
+  const features = parseFeaturesFromProduct(product)
+
   return {
     planCode,
     displayName,
@@ -147,6 +193,7 @@ function normalizeLivePlan(
     currency,
     billingPeriod,
     productId,
+    features,
   }
 }
 

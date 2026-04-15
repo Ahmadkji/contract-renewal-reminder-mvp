@@ -3,9 +3,8 @@
 import * as React from "react";
 import { FileText } from "lucide-react";
 import { Suspense } from "react";
-import { FormField, Input, Select, DatePicker } from "./form-inputs";
+import { FormField, Input, DatePicker } from "./form-inputs";
 import type { ContractFormData } from "./add-contract-form-types";
-import { CONTRACT_TYPES } from "./add-contract-form-constants";
 
 interface BasicInfoStepProps {
   formData: ContractFormData;
@@ -42,13 +41,12 @@ export function BasicInfoStep({
         />
       </FormField>
 
-      <FormField label="Contract Type" required>
-        <Select
-          options={CONTRACT_TYPES}
+      <FormField label="Contract Type" required error={errors.type}>
+        <Input
+          placeholder="e.g., SaaS Subscription, MSA, Support Retainer"
           value={formData.type}
-          onChange={(value) =>
-            updateField("type", value as ContractFormData["type"])
-          }
+          onChange={(e) => updateField("type", e.target.value)}
+          error={!!errors.type}
         />
       </FormField>
 

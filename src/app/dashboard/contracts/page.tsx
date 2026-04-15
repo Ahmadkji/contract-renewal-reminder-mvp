@@ -26,8 +26,6 @@ function getStatusColor(status: ContractSummary["status"]) {
       return "bg-[#22c55e]";
     case "expiring":
       return "bg-[#eab308]";
-    case "critical":
-      return "bg-[#ef4444]";
     case "renewing":
       return "bg-[#3b82f6]";
     default:
@@ -41,8 +39,6 @@ function getStatusBadge(status: ContractSummary["status"]) {
       return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
     case "expiring":
       return { bg: "bg-[#eab308]/20", text: "text-[#eab308]", label: "Expiring" };
-    case "critical":
-      return { bg: "bg-[#ef4444]/20", text: "text-[#ef4444]", label: "Critical" };
     case "renewing":
       return { bg: "bg-[#3b82f6]/20", text: "text-[#3b82f6]", label: "Renewing" };
     default:
@@ -51,7 +47,9 @@ function getStatusBadge(status: ContractSummary["status"]) {
 }
 
 function getTypeLabel(type: ContractSummary["type"]) {
-  switch (type) {
+  const normalized = type.trim().toLowerCase();
+
+  switch (normalized) {
     case "license":
       return "License";
     case "service":
@@ -61,7 +59,7 @@ function getTypeLabel(type: ContractSummary["type"]) {
     case "subscription":
       return "Subscription";
     default:
-      return type;
+      return type.trim() || "Unknown";
   }
 }
 
@@ -133,15 +131,6 @@ export default function ContractsPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-          Contracts
-        </h1>
-        <p className="text-sm text-[#a3a3a3] mt-1">
-          Manage and track all your contracts
-        </p>
-      </div>
-
       <ContractsToolbar
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
@@ -199,7 +188,6 @@ function ContractsToolbar({
           <option value="all">All Status</option>
           <option value="active">Active</option>
           <option value="expiring">Expiring</option>
-          <option value="critical">Critical</option>
           <option value="renewing">Renewing</option>
         </select>
       </div>

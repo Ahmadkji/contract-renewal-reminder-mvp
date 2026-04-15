@@ -48,9 +48,10 @@ export const contractInputSchema = z.object({
   vendor: z.string()
     .min(1, { message: 'Vendor name is required' })
     .max(200, { message: 'Vendor name must be less than 200 characters' }),
-  type: z.enum(['license', 'service', 'support', 'subscription'], {
-    message: 'Contract type must be license, service, support, or subscription'
-  }),
+  type: z.string()
+    .trim()
+    .min(1, { message: 'Contract type is required' })
+    .max(80, { message: 'Contract type must be less than 80 characters' }),
   startDate: dateStringSchema,
   endDate: dateStringSchema,
   value: z.number()

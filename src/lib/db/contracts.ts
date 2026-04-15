@@ -52,15 +52,20 @@ function requireDateOnlyString(value: string | Date | undefined, fieldName: stri
 function normalizeContractMutationInput(input: ContractInput) {
   const vendorContact = normalizeOptionalString(input.vendorContact)
   const vendorEmail = normalizeOptionalString(input.vendorEmail)
+  const type = input.type.trim()
 
   if (Boolean(vendorContact) !== Boolean(vendorEmail)) {
     throw new Error('Vendor contact and vendor email must both be provided together')
   }
 
+  if (!type) {
+    throw new Error('Contract type is required')
+  }
+
   return {
     name: input.name.trim(),
     vendor: input.vendor.trim(),
-    type: input.type,
+    type,
     startDate: requireDateOnlyString(input.startDate, 'Start date'),
     endDate: requireDateOnlyString(input.endDate, 'End date'),
     value: input.value ?? null,
@@ -91,12 +96,12 @@ export interface ContractWithDetails {
   id: string
   name: string
   vendor: string
-  type: 'license' | 'service' | 'support' | 'subscription'
+  type: string
   startDate: string  // YYYY-MM-DD string from database
   endDate: string    // YYYY-MM-DD string from database
   expiryDate: string
   daysLeft: number
-  status: 'active' | 'expiring' | 'critical' | 'renewing'
+  status: 'active' | 'expiring' | 'renewing'
   value: number
   currency: string
   autoRenew: boolean
@@ -200,15 +205,13 @@ export function invalidateContractsPageCache(userId?: string): void {
 // Calculate days remaining and status
 export function calculateContractStatus(endDate: string | Date): {
   daysLeft: number
-  status: 'active' | 'expiring' | 'critical' | 'renewing'
+  status: 'active' | 'expiring' | 'renewing'
 } {
   const daysLeft = getDaysUntil(endDate)
   
-  let status: 'active' | 'expiring' | 'critical' | 'renewing' = 'active'
+  let status: 'active' | 'expiring' | 'renewing' = 'active'
   
-  if (daysLeft <= 7) {
-    status = 'critical'
-  } else if (daysLeft <= 30) {
+  if (daysLeft <= 30) {
     status = 'expiring'
   }
   
@@ -298,16 +301,8 @@ function buildActivityItems(
 }
 
 function parseContractType(value: unknown): ContractWithDetails['type'] {
-  const parsed = toStringValue(value).trim().toLowerCase()
-  switch (parsed) {
-    case 'license':
-    case 'service':
-    case 'support':
-    case 'subscription':
-      return parsed
-    default:
-      return 'service'
-  }
+  const parsed = toStringValue(value).trim()
+  return parsed || 'Unknown'
 }
 
 // Transform database record to Contract type
@@ -715,7 +710,7 @@ export async function searchContracts(userId: string, query: string): Promise<Co
 // Get contracts by status with database-level filtering
 export async function getContractsByStatus(
   userId: string,
-  status: 'active' | 'expiring' | 'critical' | 'renewing'
+  status: 'active' | 'expiring' | 'renewing'
 ): Promise<ContractWithDetails[]> {
   const supabase = await getSupabase()
 
@@ -724,7 +719,6 @@ export async function getContractsByStatus(
 
   // Calculate date thresholds for status filtering (timezone-safe)
   const today = new Date()
-  const sevenDaysLater = new Date(today.getTime() + (7 * 24 * 60 * 60 * 1000))
   const thirtyDaysLater = new Date(today.getTime() + (30 * 24 * 60 * 60 * 1000))
 
   let query = supabase
@@ -744,13 +738,8 @@ export async function getContractsByStatus(
 
   // Apply status-specific filters
   switch (status) {
-    case 'critical':
-      query = query.lte('end_date', toDateOnlyString(sevenDaysLater))
-      break
     case 'expiring':
-      query = query
-        .gt('end_date', toDateOnlyString(sevenDaysLater))
-        .lte('end_date', toDateOnlyString(thirtyDaysLater))
+      query = query.lte('end_date', toDateOnlyString(thirtyDaysLater))
       break
     case 'active':
       query = query.gt('end_date', toDateOnlyString(thirtyDaysLater))
@@ -837,7 +826,6 @@ export async function getContractStats(userId: string): Promise<{
   user_id: string | null
   total_contracts: number
   expired: number
-  critical: number
   expiring: number
   active: number
   total_value: number
@@ -863,15 +851,10 @@ export async function getContractStats(userId: string): Promise<{
   // Calculate stats from data
   const total_contracts = contracts.length
   const expired = contracts.filter(c => new Date(c.end_date) < today).length
-  const critical = contracts.filter(c => {
-    const endDate = new Date(c.end_date)
-    const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    return diffDays >= 0 && diffDays <= 7
-  }).length
   const expiring = contracts.filter(c => {
     const endDate = new Date(c.end_date)
     const diffDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-    return diffDays > 7 && diffDays <= 30
+    return diffDays >= 0 && diffDays <= 30
   }).length
   const active = contracts.filter(c => {
     const endDate = new Date(c.end_date)
@@ -888,7 +871,6 @@ export async function getContractStats(userId: string): Promise<{
     user_id: userId,
     total_contracts,
     expired,
-    critical,
     expiring,
     active,
     total_value,

@@ -34,16 +34,6 @@ export function DashboardClient({ initialContracts }: DashboardClientProps) {
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Page Title */}
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-sm text-[#a3a3a3] mt-1">
-          Overview of your contract renewals
-        </p>
-      </div>
-
       {/* Main Content Grid */}
       <div className="mt-6">
         <ContractsList 
@@ -70,7 +60,6 @@ function ContractsList({
     switch (status) {
       case "active": return "bg-[#22c55e]";
       case "expiring": return "bg-[#eab308]";
-      case "critical": return "bg-[#ef4444]";
       case "renewing": return "bg-[#3b82f6]";
       default: return "bg-[#22c55e]";
     }
@@ -80,7 +69,6 @@ function ContractsList({
     switch (status) {
       case "active": return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
       case "expiring": return { bg: "bg-[#eab308]/20", text: "text-[#eab308]", label: "Expiring" };
-      case "critical": return { bg: "bg-[#ef4444]/20", text: "text-[#ef4444]", label: "Critical" };
       case "renewing": return { bg: "bg-[#3b82f6]/20", text: "text-[#3b82f6]", label: "Renewing" };
       default: return { bg: "bg-[#22c55e]/20", text: "text-[#22c55e]", label: "Active" };
     }

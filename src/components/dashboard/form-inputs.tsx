@@ -57,7 +57,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           type={type}
           ref={ref}
           className={cn(
-            "w-full h-10 px-3 bg-[#0a0a0a] border rounded-lg text-white text-sm transition-all duration-200",
+            "w-full h-11 sm:h-10 px-3 bg-[#0a0a0a] border rounded-lg text-white text-sm transition-all duration-200",
             "placeholder:text-white/30",
             "hover:border-white/20",
             "focus:outline-none focus:border-[#06b6d4] focus:ring-2 focus:ring-[#06b6d4]/20",
@@ -411,14 +411,15 @@ interface ToggleProps {
   disabled?: boolean
   label?: string
   description?: string
+  icon?: React.ReactNode
 }
 
-export function Toggle({ checked, onChange, disabled, label, description }: ToggleProps) {
+export function Toggle({ checked, onChange, disabled, label, description, icon }: ToggleProps) {
   return (
-    <label className={cn(
-      "flex items-center gap-3",
-      disabled && "opacity-50 cursor-not-allowed"
-    )}>
+    <label className="flex items-center gap-3">
+      {icon && (
+        <div className="flex-shrink-0 text-white/40">{icon}</div>
+      )}
       <button
         type="button"
         role="switch"
@@ -426,14 +427,18 @@ export function Toggle({ checked, onChange, disabled, label, description }: Togg
         disabled={disabled}
         onClick={() => !disabled && onChange?.(!checked)}
         className={cn(
-          "relative w-11 h-6 rounded-full transition-colors duration-200",
-          checked ? "bg-[#06b6d4]" : "bg-white/10"
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border shadow-inner transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06b6d4] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]",
+          disabled && "cursor-not-allowed opacity-50",
+          checked
+            ? "bg-[#06b6d4] border-[#67e8f9]"
+            : "bg-slate-700/85 border-white/30"
         )}
       >
         <span
+          aria-hidden="true"
           className={cn(
-            "absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200",
-            checked && "transform translate-x-5"
+            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.45)] ring-0 transition-transform duration-200 ease-in-out",
+            checked ? "translate-x-5" : "translate-x-0"
           )}
         />
       </button>

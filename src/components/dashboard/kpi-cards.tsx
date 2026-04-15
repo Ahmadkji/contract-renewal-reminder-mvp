@@ -353,13 +353,6 @@ function Segment({ data, isHovered, isSelected, onHover, onClick }: SegmentProps
             animationDuration: isHovered ? "1s" : "2s",
           }}
         />
-        
-        {/* Critical badge for expiring */}
-        {data.id === "expiring" && data.metadata?.critical && data.metadata.critical > 0 && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#ef4444] rounded-full flex items-center justify-center text-[8px] font-bold text-white animate-bounce">
-            {data.metadata.critical}
-          </div>
-        )}
       </div>
 
       {/* Zone 2: Stacked Data (flex-1) */}
@@ -543,13 +536,6 @@ function MobileHorizontalKPI({ data }: { data: KPICardData[] }) {
               {/* Micro trend indicator */}
               {segment.trend && (
                 <span className="text-[10px] text-[#22c55e]">↑</span>
-              )}
-              
-              {/* Critical badge */}
-              {segment.id === "expiring" && segment.metadata?.critical && segment.metadata.critical > 0 && (
-                <span className="w-3 h-3 bg-[#ef4444] rounded-full text-[6px] flex items-center justify-center text-white">
-                  {segment.metadata.critical}
-                </span>
               )}
             </div>
             

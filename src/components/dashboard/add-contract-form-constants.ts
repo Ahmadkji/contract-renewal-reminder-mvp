@@ -2,13 +2,6 @@
 // Add Contract Form Constants
 // ============================================
 
-export const CONTRACT_TYPES = [
-  { value: "license", label: "Software License" },
-  { value: "subscription", label: "Subscription" },
-  { value: "service", label: "Service Agreement" },
-  { value: "support", label: "Support Contract" },
-];
-
 export const CURRENCIES = [
   { value: "USD", label: "USD ($)" },
   { value: "EUR", label: "EUR (€)" },

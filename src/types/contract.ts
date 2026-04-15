@@ -1,6 +1,6 @@
-export type ContractType = 'license' | 'service' | 'support' | 'subscription'
+export type ContractType = string
 
-export type ContractStatus = 'active' | 'expiring' | 'critical' | 'renewing'
+export type ContractStatus = 'active' | 'expiring' | 'renewing'
 
 export interface ContractSummary {
   id: string

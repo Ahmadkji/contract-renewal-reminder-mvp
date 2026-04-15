@@ -16,7 +16,7 @@ import {
   Trash2, Pencil
 } from "lucide-react"
 import { useContract } from "@/hooks/use-contracts"
-import type { ContractActivityItem, ContractDetail, ContractStatus, ContractType } from "@/types/contract"
+import type { ContractActivityItem, ContractDetail, ContractStatus } from "@/types/contract"
 
 // ============================================
 // Helpers
@@ -30,15 +30,22 @@ const statusConfig: Record<ContractStatus, {
 }> = {
   active: { label: "Active", color: "#22c55e", bgColor: "bg-[#22c55e]/15", borderColor: "border-[#22c55e]/30", icon: CheckCircle },
   expiring: { label: "Expiring Soon", color: "#eab308", bgColor: "bg-[#eab308]/15", borderColor: "border-[#eab308]/30", icon: AlertTriangle },
-  critical: { label: "Critical", color: "#ef4444", bgColor: "bg-[#ef4444]/15", borderColor: "border-[#ef4444]/30", icon: XCircle },
   renewing: { label: "Renewing", color: "#3b82f6", bgColor: "bg-[#3b82f6]/15", borderColor: "border-[#3b82f6]/30", icon: Clock },
 }
 
-const typeLabels: Record<ContractType, string> = {
+const typeLabels: Record<string, string> = {
   license: "Software License",
   subscription: "Subscription",
   service: "Service Agreement",
   support: "Support Contract",
+}
+
+function getTypeLabel(value: string): string {
+  const normalized = value.trim().toLowerCase()
+  if (typeLabels[normalized]) {
+    return typeLabels[normalized]
+  }
+  return value.trim() || "Unknown"
 }
 
   // ============================================
@@ -114,7 +121,7 @@ export function ContractDetailView({
                         </span>
                       )}
                       <span className="text-xs text-white/40">
-                        {typeLabels[contract.type]}
+                        {getTypeLabel(contract.type)}
                       </span>
                     </div>
                   </div>

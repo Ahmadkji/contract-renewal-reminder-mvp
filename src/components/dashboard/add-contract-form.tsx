@@ -9,13 +9,14 @@ import {
   ChevronDown,
   FileText,
   Loader2,
+  Mail,
+  RefreshCw,
 } from "lucide-react";
 import { toast as toastFn } from "@/hooks/use-toast";
 import type { ContractFormData } from "./add-contract-form-types";
 import { initialFormData } from "./add-contract-form-types";
 import { validateForm } from "./add-contract-form-validation";
 import {
-  CONTRACT_TYPES,
   CURRENCIES,
   REMINDER_OPTIONS,
 } from "./add-contract-form-constants";
@@ -140,7 +141,7 @@ export function AddContractForm({
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="flex items-center gap-2 px-5 py-2 bg-[#22c55e] text-white text-sm font-medium rounded-lg hover:bg-[#16a34a] transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-1.5 h-auto !min-h-0 bg-[#22c55e] text-white text-sm font-medium rounded-lg hover:bg-[#16a34a] transition-colors disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
@@ -176,13 +177,12 @@ export function AddContractForm({
             </FormField>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField label="Contract Type" required>
-                <Select
-                  options={CONTRACT_TYPES}
+              <FormField label="Contract Type" required error={errors.type}>
+                <Input
+                  placeholder="e.g., SaaS Subscription, MSA, Support Retainer"
                   value={formData.type}
-                  onChange={(value) =>
-                    updateField("type", value as ContractFormData["type"])
-                  }
+                  onChange={(e) => updateField("type", e.target.value)}
+                  error={!!errors.type}
                 />
               </FormField>
 
@@ -260,6 +260,7 @@ export function AddContractForm({
                   onChange={(checked) => updateField("autoRenew", checked)}
                   label="Auto-renewal"
                   description="Renews at end of term"
+                  icon={<RefreshCw className="w-4 h-4" />}
                 />
               </div>
             </div>
@@ -281,6 +282,7 @@ export function AddContractForm({
                 onChange={(checked) => updateField("emailReminders", checked)}
                 label="Send email reminders"
                 description="Notify stakeholders before expiry"
+                icon={<Mail className="w-4 h-4" />}
               />
             </div>
           </div>
@@ -297,7 +299,7 @@ export function AddContractForm({
                     type="button"
                     onClick={() => toggleReminderDay(option.value)}
                     className={cn(
-                      "rounded-lg border px-3 py-1.5 text-sm transition-all duration-200",
+                      "rounded-lg border px-3 py-2 text-sm transition-all duration-200 min-h-[44px]",
                       formData.reminderDays.includes(option.value)
                         ? "border-[#06b6d4] bg-[#06b6d4]/20 text-[#06b6d4]"
                         : "border-white/10 bg-transparent text-white/60 hover:border-white/20"
@@ -390,8 +392,8 @@ function SectionHeader({
 }) {
   return (
     <div className={cn("mb-4 flex items-start gap-3", className)}>
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5">
-        <Icon className="h-4 w-4 text-white/80" />
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#06b6d4]/10">
+        <Icon className="h-5 w-5 text-[#06b6d4]" />
       </div>
       <div>
         <h3 className="text-sm font-semibold text-white">{title}</h3>

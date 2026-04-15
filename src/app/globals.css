@@ -2325,10 +2325,6 @@
   background-color: #eab308;
 }
 
-.status-critical {
-  background-color: #ef4444;
-}
-
 .status-renewing {
   background-color: #3b82f6;
 }
@@ -2342,11 +2338,6 @@
 .status-bg-expiring {
   background-color: rgba(234, 179, 8, 0.2);
   color: #eab308;
-}
-
-.status-bg-critical {
-  background-color: rgba(239, 68, 68, 0.2);
-  color: #ef4444;
 }
 
 .status-bg-renewing {
@@ -4552,4 +4543,60 @@
 
 .zoom-in-95 {
   animation: zoomIn95 200ms var(--ease-smooth) forwards;
+}
+
+/* ========================================
+   Mobile Optimizations
+   ======================================== */
+
+/* Improve touch targets on mobile */
+@media (max-width: 768px) {
+  /* Ensure all buttons have minimum touch target size */
+  button:not([role="switch"]), 
+  [role="button"],
+  a.btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent zoom on input focus for iOS */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  /* Improve scroll performance */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Disable hover effects on touch devices */
+  @media (hover: none) {
+    .group:hover .group-hover\:opacity-100 {
+      opacity: 1;
+    }
+  }
+}
+
+/* Landscape mobile adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .max-h-\[92vh\] {
+    max-height: 85vh;
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

@@ -12,6 +12,9 @@ export function validateForm(
   if (!formData.name.trim()) {
     errors.name = "Contract name is required";
   }
+  if (!formData.type.trim()) {
+    errors.type = "Contract type is required";
+  }
   if (!formData.startDate) {
     errors.startDate = "Start date is required";
   }

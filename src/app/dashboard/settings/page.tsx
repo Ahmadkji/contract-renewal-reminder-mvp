@@ -114,13 +114,6 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Settings</h1>
-        <p className="mt-1 text-sm text-[#a3a3a3]">
-          Your profile is stored in Supabase and used by reminders and billing.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section className="rounded-xl border border-white/[0.08] bg-[#141414] p-6 lg:col-span-2">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-medium text-white">

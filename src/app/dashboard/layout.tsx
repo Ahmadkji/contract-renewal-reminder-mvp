@@ -14,6 +14,7 @@ import {
   useMvpStoreSubscription,
   useUpdateContract,
 } from "@/hooks/use-contracts";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ContractDetailView } from "@/components/dashboard/contract-detail-view";
 import {
   AlertDialog,
@@ -31,8 +32,7 @@ import {
 } from "@/components/dashboard/dashboard-ui-context";
 import { toast } from "@/hooks/use-toast";
 import { toDateOnlyString } from "@/lib/utils/date-utils";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 
 // ============================================
@@ -121,7 +121,7 @@ function DashboardInteractiveElements({ children }: { children: React.ReactNode 
   useMvpStoreSubscription();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const {
     addContractOpen,
     contractDetailOpen,
@@ -178,7 +178,6 @@ function DashboardInteractiveElements({ children }: { children: React.ReactNode 
         sidebarExpanded={sidebarExpanded}
         setSidebarExpanded={setSidebarExpanded}
         isMobile={isMobile}
-        setIsMobile={setIsMobile}
         mobileMenuOpen={mobileMenuOpen}
         setMobileMenuOpen={setMobileMenuOpen}
         onAddClick={openAddContract}
@@ -253,7 +252,6 @@ function DashboardMainContent({
   sidebarExpanded,
   setSidebarExpanded,
   isMobile,
-  setIsMobile,
   mobileMenuOpen,
   setMobileMenuOpen,
   onAddClick
@@ -262,25 +260,51 @@ function DashboardMainContent({
   sidebarExpanded: boolean;
   setSidebarExpanded: (v: boolean) => void;
   isMobile: boolean;
-  setIsMobile: (v: boolean) => void;
   mobileMenuOpen: boolean;
   setMobileMenuOpen: (v: boolean) => void;
   onAddClick: () => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
+  const handleAddClick = useCallback(() => {
+    setMobileMenuOpen(false);
+    onAddClick();
+  }, [onAddClick, setMobileMenuOpen]);
 
-  // Check for mobile viewport
+  // Close the mobile menu when crossing into desktop widths.
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth < 1024) {
-        setSidebarExpanded(false);
+    if (!isMobile && mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  }, [isMobile, mobileMenuOpen, setMobileMenuOpen]);
+
+  // Prevent background scroll while mobile menu is open.
+  useEffect(() => {
+    if (!mobileMenuOpen) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen || !isMobile) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileMenuOpen(false);
       }
     };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, [setIsMobile, setSidebarExpanded]);
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobile, mobileMenuOpen, setMobileMenuOpen]);
 
   // Scroll detection for header
   useEffect(() => {
@@ -303,14 +327,14 @@ function DashboardMainContent({
         <DashboardSidebar
           expanded={sidebarExpanded}
           setExpanded={setSidebarExpanded}
-          onAddClick={onAddClick}
+          onAddClick={handleAddClick}
         />
       )}
       
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && isMobile && (
         <MobileMenu
-          onAddClick={onAddClick}
+          onAddClick={handleAddClick}
           onClose={() => setMobileMenuOpen(false)}
         />
       )}
@@ -325,30 +349,36 @@ function DashboardMainContent({
         <DashboardHeader
           isMobile={isMobile}
           onMenuClick={() => setMobileMenuOpen(true)}
-          onAddClick={onAddClick}
+          onAddClick={handleAddClick}
           scrolled={scrolled}
         />
         
         {/* Content Area - Children render here */}
         <div className="main-scroll-container dashboard-scroll flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           {children}
-          <div className="mx-auto mt-8 max-w-6xl rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-xs text-[#a3a3a3]">
-            <span>Support: </span>
-            <a href={SUPPORT_MAILTO} className="text-cyan-300 hover:text-cyan-200">
-              {SUPPORT_EMAIL}
-            </a>
-            <span className="mx-2 text-white/30">|</span>
-            <Link href="/terms" className="hover:text-white">
-              Terms of Service
-            </Link>
-            <span className="mx-2 text-white/30">|</span>
-            <Link href="/privacy" className="hover:text-white">
-              Privacy Policy
-            </Link>
-            <span className="mx-2 text-white/30">|</span>
-            <Link href="/refund-policy" className="hover:text-white">
-              Refund Policy
-            </Link>
+        </div>
+        
+        {/* Legal Footer - Always at bottom */}
+        <div className="shrink-0 bg-[#0a0a0a] border-t border-white/[0.08] px-4 sm:px-6 lg:px-8 py-3">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[13px] leading-5 text-[#a3a3a3]">
+              <span>Support:</span>
+              <a href={SUPPORT_MAILTO} className="text-cyan-300 hover:text-cyan-200">
+                {SUPPORT_EMAIL}
+              </a>
+              <span className="text-white/30 select-none">|</span>
+              <Link href="/terms" className="hover:text-white">
+                Terms of Service
+              </Link>
+              <span className="text-white/30 select-none">|</span>
+              <Link href="/privacy" className="hover:text-white">
+                Privacy Policy
+              </Link>
+              <span className="text-white/30 select-none">|</span>
+              <Link href="/refund-policy" className="hover:text-white">
+                Refund Policy
+              </Link>
+            </div>
           </div>
         </div>
       </main>

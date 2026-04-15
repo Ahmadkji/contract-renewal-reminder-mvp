@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import {
-  Bell,
   Plus,
   Menu,
 } from "lucide-react";
@@ -42,34 +41,33 @@ export function DashboardHeader({ isMobile, onMenuClick, onAddClick, scrolled }:
         scrolled ? "shadow-lg" : ""
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-14 sm:min-h-16 py-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-white">{title}</h1>
-            <p className="text-sm text-[#a3a3a3]">{subtitle}</p>
+            <h1 className="text-base sm:text-xl font-semibold text-white">{title}</h1>
+            <p className="hidden sm:block text-sm text-[#a3a3a3]">{subtitle}</p>
           </div>
         </div>
         
-        <div className="flex items-center gap-3">
-          {/* Notification Bell */}
-          <button className="w-9 h-9 flex items-center justify-center text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5 focus-ring">
-            <Bell className="w-5 h-5" />
-          </button>
-          
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Add Button */}
           <button
             onClick={onAddClick}
-            className="h-9 px-4 items-center gap-2 text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-all flex focus-ring"
+            className={`h-10 shrink-0 items-center text-sm font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-colors flex focus-ring ${
+              isMobile ? "w-10 px-0 justify-center" : "px-4 gap-2 justify-center"
+            }`}
+            aria-label="Add contract"
           >
             <Plus className="w-4 h-4" />
-            {isMobile ? "" : "Add Contract"}
+            {!isMobile && "Add Contract"}
           </button>
           
           {/* Mobile Menu Button */}
           {isMobile && (
             <button
                 onClick={onMenuClick}
-                className="w-9 h-9 flex items-center justify-center text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5 focus-ring"
+                className="w-10 h-10 flex items-center justify-center text-[#a3a3a3] hover:text-white transition-colors rounded-lg hover:bg-white/5 focus-ring"
+                aria-label="Open menu"
               >
                 <Menu className="w-5 h-5" />
               </button>

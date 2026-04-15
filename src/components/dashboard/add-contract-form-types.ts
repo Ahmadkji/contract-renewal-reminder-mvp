@@ -8,7 +8,7 @@ export type { ContractFormData };
 
 export const initialFormData: ContractFormData = {
   name: "",
-  type: "subscription",
+  type: "",
   startDate: null,
   endDate: null,
   vendor: "",
