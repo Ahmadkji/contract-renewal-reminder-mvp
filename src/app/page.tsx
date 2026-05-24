@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import Script from "next/script";
 import {
   Clock,
   Search,
@@ -3686,6 +3687,13 @@ export default function Home() {
 
       {/* Floating Action Button (Mobile) */}
       <FloatingActionButton />
+
+      {/* Chatbot Widget */}
+      <Script
+        src="https://workspace-79721d51-2e5e-4efc-ba28-2.vercel.app/widget.js"
+        data-clinic-slug="khosa"
+        strategy="afterInteractive"
+      />
     </main>
   );
 }
