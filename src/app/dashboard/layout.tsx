@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { MobileMenu } from "@/components/dashboard/mobile-menu";
@@ -35,6 +34,7 @@ import { toDateOnlyString } from "@/lib/utils/date-utils";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
+import { WidgetEmbed } from "@/components/widget/widget-embed";
 
 // ============================================
 // Dashboard Layout - Client Component
@@ -222,11 +222,7 @@ function DashboardInteractiveElements({ children }: { children: React.ReactNode 
       />
 
       {/* Chatbot Widget */}
-      <Script
-        src="https://workspace-79721d51-2e5e-4efc-ba28-2.vercel.app/widget.js"
-        data-clinic-slug="khosa"
-        strategy="afterInteractive"
-      />
+      <WidgetEmbed clinicSlug="khosa" location="dashboard" />
     </div>
   );
 }

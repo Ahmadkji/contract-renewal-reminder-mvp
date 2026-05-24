@@ -22,12 +22,22 @@ function buildContentSecurityPolicy(): string {
     connectSrc.add(supabaseOrigin);
   }
 
+  // Widget origin – must be listed so the browser can load AND execute the script
+  const widgetOrigin = "https://workspace-79721d51-2e5e-4efc-ba28-2.vercel.app";
+  connectSrc.add(widgetOrigin);
+  frameSrc.add(widgetOrigin);
+
   if (!isProduction) {
     connectSrc.add("ws:");
     connectSrc.add("wss:");
   }
 
-  const scriptSrc = ["'self'", "'unsafe-inline'", ...(isProduction ? [] : ["'unsafe-eval'"])];
+  const scriptSrc = [
+    "'self'",
+    "'unsafe-inline'",
+    widgetOrigin,
+    ...(isProduction ? [] : ["'unsafe-eval'"]),
+  ];
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",

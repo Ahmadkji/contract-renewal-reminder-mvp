@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import Script from "next/script";
 import {
   Clock,
   Search,
@@ -63,6 +62,7 @@ import {
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/legal";
 import { SITE_URL } from "@/lib/site-url";
 import { FAQ_ITEMS, SOCIAL_PROOF_TESTIMONIALS } from "@/components/landing/homepage-static-content";
+import { WidgetEmbed } from "@/components/widget/widget-embed";
 
 const HOMEPAGE_STRUCTURED_DATA = {
   "@context": "https://schema.org",
@@ -3689,11 +3689,7 @@ export default function Home() {
       <FloatingActionButton />
 
       {/* Chatbot Widget */}
-      <Script
-        src="https://workspace-79721d51-2e5e-4efc-ba28-2.vercel.app/widget.js"
-        data-clinic-slug="khosa"
-        strategy="afterInteractive"
-      />
+      <WidgetEmbed clinicSlug="khosa" location="landing" />
     </main>
   );
 }
